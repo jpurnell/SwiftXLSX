@@ -22,13 +22,15 @@ public final class Workbook: @unchecked Sendable {
         entries.append(("_rels/.rels", Data(relsXML().utf8)))
         entries.append(("xl/workbook.xml", Data(workbookXML().utf8)))
         entries.append(("xl/_rels/workbook.xml.rels", Data(workbookRelsXML().utf8)))
-        entries.append(("xl/styles.xml", Data(styleSheet.toXML().utf8)))
 
+        // Worksheets must be generated before styles and shared strings
+        // because worksheetXML() registers styles and shared string entries.
         for (i, sheet) in sheets.enumerated() {
             let xml = worksheetXML(sheet: sheet)
             entries.append(("xl/worksheets/sheet\(i + 1).xml", Data(xml.utf8)))
         }
 
+        entries.append(("xl/styles.xml", Data(styleSheet.toXML().utf8)))
         entries.append(("xl/sharedStrings.xml", Data(sharedStrings.toXML().utf8)))
 
         try ZIPWriter.write(entries: entries, to: url)
