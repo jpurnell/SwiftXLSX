@@ -1,4 +1,5 @@
 import Foundation
+import SwiftZIP
 
 /// An Excel workbook containing one or more worksheets.
 // Justification: Workbook is only mutated during construction, before save
@@ -21,24 +22,24 @@ public final class Workbook: @unchecked Sendable {
 
     /// Saves the workbook as an XLSX file at the given URL.
     public func save(to url: URL) throws {
-        var entries: [(path: String, data: Data)] = []
+        var entries: [ZIPEntry] = []
 
-        entries.append(("[Content_Types].xml", Data(contentTypesXML().utf8)))
-        entries.append(("_rels/.rels", Data(relsXML().utf8)))
-        entries.append(("xl/workbook.xml", Data(workbookXML().utf8)))
-        entries.append(("xl/_rels/workbook.xml.rels", Data(workbookRelsXML().utf8)))
+        entries.append(ZIPEntry(path: "[Content_Types].xml", data: Data(contentTypesXML().utf8)))
+        entries.append(ZIPEntry(path: "_rels/.rels", data: Data(relsXML().utf8)))
+        entries.append(ZIPEntry(path: "xl/workbook.xml", data: Data(workbookXML().utf8)))
+        entries.append(ZIPEntry(path: "xl/_rels/workbook.xml.rels", data: Data(workbookRelsXML().utf8)))
 
         // Worksheets must be generated before styles and shared strings
         // because worksheetXML() registers styles and shared string entries.
         for (i, sheet) in sheets.enumerated() {
             let xml = worksheetXML(sheet: sheet)
-            entries.append(("xl/worksheets/sheet\(i + 1).xml", Data(xml.utf8)))
+            entries.append(ZIPEntry(path: "xl/worksheets/sheet\(i + 1).xml", data: Data(xml.utf8)))
         }
 
-        entries.append(("xl/styles.xml", Data(styleSheet.toXML().utf8)))
-        entries.append(("xl/sharedStrings.xml", Data(sharedStrings.toXML().utf8)))
+        entries.append(ZIPEntry(path: "xl/styles.xml", data: Data(styleSheet.toXML().utf8)))
+        entries.append(ZIPEntry(path: "xl/sharedStrings.xml", data: Data(sharedStrings.toXML().utf8)))
 
-        try ZIPWriter.write(entries: entries, to: url)
+        try SwiftZIP.ZIPWriter.write(entries: entries, to: url)
     }
 
     // MARK: - XML Generation

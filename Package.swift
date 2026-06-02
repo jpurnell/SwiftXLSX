@@ -10,10 +10,14 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
+        .package(path: "../SwiftZIP"),
     ],
     targets: [
         .target(
             name: "SwiftXLSX",
+            dependencies: [
+                .product(name: "SwiftZIP", package: "SwiftZIP"),
+            ],
             path: "Sources/SwiftXLSX"
         ),
         .testTarget(

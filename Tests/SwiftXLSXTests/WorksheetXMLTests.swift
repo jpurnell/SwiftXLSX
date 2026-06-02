@@ -1,4 +1,5 @@
 import XCTest
+import SwiftZIP
 @testable import SwiftXLSX
 
 final class WorksheetXMLTests: XCTestCase {
@@ -14,33 +15,14 @@ final class WorksheetXMLTests: XCTestCase {
         try wb.save(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
         let data = try Data(contentsOf: url)
-        return extractSheetXML(from: data)
+        return try extractSheetXML(from: data)
     }
 
-    private func extractSheetXML(from zipData: Data) -> String {
-        var pos = 0
-        let bytes = [UInt8](zipData)
-        while pos + 4 <= bytes.count {
-            guard bytes[pos] == 0x50, bytes[pos+1] == 0x4B,
-                  bytes[pos+2] == 0x03, bytes[pos+3] == 0x04 else {
-                pos += 1
-                continue
-            }
-            let nameLen = Int(bytes[pos+26]) | (Int(bytes[pos+27]) << 8)
-            let extraLen = Int(bytes[pos+28]) | (Int(bytes[pos+29]) << 8)
-            let compSize = Int(bytes[pos+18]) | (Int(bytes[pos+19]) << 8)
-                | (Int(bytes[pos+20]) << 16) | (Int(bytes[pos+21]) << 24)
-            let nameStart = pos + 30
-            let nameBytes = bytes[nameStart..<(nameStart + nameLen)]
-            let name = String(bytes: nameBytes, encoding: .utf8) ?? ""
-            let dataStart = nameStart + nameLen + extraLen
-            if name.contains("sheet1.xml") || name.contains("sheet/sheet1") {
-                let xmlBytes = bytes[dataStart..<(dataStart + compSize)]
-                return String(bytes: xmlBytes, encoding: .utf8) ?? ""
-            }
-            pos = dataStart + compSize
-        }
-        return ""
+    private func extractSheetXML(from zipData: Data) throws -> String {
+        guard let entry = try ZIPReader.readEntry(
+            named: "xl/worksheets/sheet1.xml", from: zipData
+        ) else { return "" }
+        return String(data: entry.data, encoding: .utf8) ?? ""
     }
 
     // MARK: - Empty Sheet (Baseline)
