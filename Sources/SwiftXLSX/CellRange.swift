@@ -13,13 +13,16 @@ public struct CellRange: Equatable, Hashable, Sendable {
     }
 
     public init(_ reference: String) {
-        let parts = reference.split(separator: ":")
+        let parts = reference.split(separator: ":", maxSplits: 1)
         self.start = CellRef(String(parts[0]))
         self.end = parts.count > 1 ? CellRef(String(parts[1])) : CellRef(String(parts[0]))
     }
 
     public var reference: String {
-        "\(start.reference):\(end.reference)"
+        if start == end {
+            return start.reference
+        }
+        return "\(start.reference):\(end.reference)"
     }
 
     public func absolute() -> CellRange {
@@ -27,8 +30,14 @@ public struct CellRange: Equatable, Hashable, Sendable {
     }
 
     public var cells: [CellRef] {
-        // Stub — agent implements full iteration
-        []
+        var result: [CellRef] = []
+        result.reserveCapacity(rowCount * columnCount)
+        for row in start.row...end.row {
+            for col in start.column...end.column {
+                result.append(CellRef(column: col, row: row))
+            }
+        }
+        return result
     }
 
     public var rowCount: Int {

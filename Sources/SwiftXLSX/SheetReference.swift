@@ -13,7 +13,7 @@ public struct SheetReference: Equatable, Hashable, Sendable {
     }
 
     public var reference: String {
-        // Stub — agent implements proper quoting for sheet names with spaces
-        "'\(sheetName)'!\(range.reference)"
+        let escaped = sheetName.replacingOccurrences(of: "'", with: "''")
+        return "'\(escaped)'!\(range.reference)"
     }
 }
