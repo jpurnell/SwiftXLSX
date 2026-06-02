@@ -27,10 +27,22 @@ public final class Worksheet: @unchecked Sendable {
         cells[ref] = (.number(Double(value)), style)
     }
 
-    /// Writes a raw formula string to the specified cell.
+    /// Writes a formula string to the specified cell, parsing it into an AST.
+    ///
+    /// If the formula cannot be parsed, it is stored as a raw string fallback
+    /// that will be written verbatim to the `.xlsx` file.
+    ///
+    /// - Parameters:
+    ///   - formula: The Excel formula string (leading `=` is optional).
+    ///   - ref: The cell reference (e.g., `"B4"`).
+    ///   - style: The cell style to apply.
     public func writeFormula(_ formula: String, to ref: String, style: CellStyle = .general) {
         let cleaned = formula.hasPrefix("=") ? String(formula.dropFirst()) : formula
-        cells[ref] = (.formula(.function("_RAW", [.text(cleaned)]), cached: nil), style)
+        if let ast = try? FormulaParser.parse(cleaned) { // silent: fallback to _RAW on parse failure
+            cells[ref] = (.formula(ast, cached: nil), style)
+        } else {
+            cells[ref] = (.formula(.function("_RAW", [.text(cleaned)]), cached: nil), style)
+        }
     }
 
     /// Writes a formula AST to the specified cell.
