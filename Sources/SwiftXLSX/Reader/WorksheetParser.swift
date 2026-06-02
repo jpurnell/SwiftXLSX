@@ -200,6 +200,7 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
         // Formula cell
         if !currentFormula.isEmpty {
             let ast: FormulaAST
+            // silent: fallback to _RAW wrapper on parse failure is intentional
             if let parsed = try? FormulaParser.parse(currentFormula) {
                 ast = parsed
             } else {

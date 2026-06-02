@@ -9,6 +9,7 @@ final class ContentTypesParser: NSObject, XMLParserDelegate {
     private var defaults: [String: String] = [:]
     private var overrides: [String: String] = [:]
 
+    // LIVE: public API for consumers parsing OOXML content types
     static func parse(data: Data) throws -> ContentTypes {
         let parser = ContentTypesParser()
         let xmlParser = XMLParser(data: data)
