@@ -41,6 +41,11 @@ public enum BuiltinFinancialFunctions {
         return try requireNumber(args[index])
     }
 
+    private static func safeDivide(_ numerator: Double, _ denominator: Double) -> Double? {
+        if denominator == 0 { return nil }
+        return numerator / denominator
+    }
+
     // MARK: - PMT
 
     /// `PMT(rate, nper, pv, [fv], [type])` — Periodic payment for a loan or annuity.
@@ -262,8 +267,8 @@ public enum BuiltinFinancialFunctions {
             if abs(npvValue) < tolerance {
                 return .number(x)
             }
-            if dnpv == 0 { return .error(.num) }
-            let newX = x - npvValue / dnpv
+            guard let step = safeDivide(npvValue, dnpv) else { return .error(.num) }
+            let newX = x - step
             if abs(newX - x) < tolerance {
                 return .number(newX)
             }
@@ -412,8 +417,8 @@ public enum BuiltinFinancialFunctions {
             if abs(f) < tolerance {
                 return .number(x)
             }
-            if df == 0 { return .error(.num) }
-            let newX = x - f / df
+            guard let step = safeDivide(f, df) else { return .error(.num) }
+            let newX = x - step
             if abs(newX - x) < tolerance {
                 return .number(newX)
             }
@@ -510,11 +515,14 @@ public enum BuiltinFinancialFunctions {
         let intLife = Int(life)
 
         // Calculate rate, rounded to 3 decimal places
+        // cost > 0 and life > 0 are guaranteed by the guard above
         let rawRate: Double
         if salvage == 0 {
             rawRate = 1.0
         } else {
-            rawRate = 1.0 - pow(salvage / cost, 1.0 / life)
+            guard let ratio = safeDivide(salvage, cost),
+                  let invLife = safeDivide(1.0, life) else { return .error(.num) }
+            rawRate = 1.0 - pow(ratio, invLife)
         }
         let dbRate = (rawRate * 1000.0).rounded() / 1000.0
 

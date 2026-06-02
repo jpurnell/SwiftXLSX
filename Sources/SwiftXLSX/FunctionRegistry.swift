@@ -100,8 +100,8 @@ public struct FunctionRegistry: Sendable {
     /// Creates a new registry by extending a base registry with additional functions.
     ///
     /// The base registry is not modified. The returned registry contains all functions
-    /// from both the base and the ``functions`` dictionary. If a name appears in both,
-    /// the value from ``functions`` takes precedence.
+    /// from both the base and the `functions` dictionary. If a name appears in both,
+    /// the value from `functions` takes precedence.
     ///
     /// - Parameters:
     ///   - base: The base registry to extend. Defaults to ``builtin``.

@@ -62,6 +62,11 @@ public enum BuiltinAggregationFunctions {
         }
     }
 
+    private static func safeDivide(_ numerator: Double, _ denominator: Double) throws -> Double {
+        guard denominator != 0 else { throw EvalError.div0Error }
+        return numerator / denominator
+    }
+
     /// Wraps a function body so that ``EvalError`` maps to the correct ``CellValue/error(_:)``.
     private static func catching(_ body: () throws -> CellValue) -> CellValue {
         do {
@@ -427,8 +432,7 @@ public enum BuiltinAggregationFunctions {
                 }
             }
 
-            guard count > 0 else { throw EvalError.div0Error }
-            return .number(total / Double(count))
+            return .number(try safeDivide(total, Double(count)))
         }
     }
 }

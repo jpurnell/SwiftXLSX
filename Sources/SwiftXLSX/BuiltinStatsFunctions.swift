@@ -94,6 +94,11 @@ public enum BuiltinStatsFunctions {
         return count
     }
 
+    private static func safeDivide(_ numerator: Double, _ denominator: Double) throws -> Double {
+        guard denominator != 0 else { throw EvalError.div0Error }
+        return numerator / denominator
+    }
+
     /// Wraps function body so that ``EvalError`` maps to the correct ``CellValue/error(_:)``.
     private static func catching(_ body: () throws -> CellValue) -> CellValue {
         do {
@@ -121,7 +126,7 @@ public enum BuiltinStatsFunctions {
             let numbers = flattenNumbers(args)
             guard !numbers.isEmpty else { throw EvalError.div0Error }
             let sum = numbers.reduce(0.0, +)
-            return .number(sum / Double(numbers.count))
+            return .number(try safeDivide(sum, Double(numbers.count)))
         }
     }
 
@@ -135,10 +140,11 @@ public enum BuiltinStatsFunctions {
         catching {
             if let e = findFirstError(args) { throw EvalError.excelError(e) }
             let numbers = flattenNumbers(args)
-            guard numbers.count >= 2 else { throw EvalError.div0Error }
-            let mean = numbers.reduce(0.0, +) / Double(numbers.count)
+            let count = Double(numbers.count)
+            guard count >= 2 else { throw EvalError.div0Error }
+            let mean = try safeDivide(numbers.reduce(0.0, +), count)
             let sumSqDev = numbers.reduce(0.0) { $0 + ($1 - mean) * ($1 - mean) }
-            let variance = sumSqDev / Double(numbers.count - 1)
+            let variance = try safeDivide(sumSqDev, count - 1)
             return .number(variance.squareRoot())
         }
     }
@@ -154,9 +160,10 @@ public enum BuiltinStatsFunctions {
             if let e = findFirstError(args) { throw EvalError.excelError(e) }
             let numbers = flattenNumbers(args)
             guard !numbers.isEmpty else { throw EvalError.div0Error }
-            let mean = numbers.reduce(0.0, +) / Double(numbers.count)
+            let count = Double(numbers.count)
+            let mean = try safeDivide(numbers.reduce(0.0, +), count)
             let sumSqDev = numbers.reduce(0.0) { $0 + ($1 - mean) * ($1 - mean) }
-            let variance = sumSqDev / Double(numbers.count)
+            let variance = try safeDivide(sumSqDev, count)
             return .number(variance.squareRoot())
         }
     }
@@ -332,10 +339,11 @@ public enum BuiltinStatsFunctions {
         catching {
             if let e = findFirstError(args) { throw EvalError.excelError(e) }
             let numbers = flattenNumbers(args)
-            guard numbers.count >= 2 else { throw EvalError.div0Error }
-            let mean = numbers.reduce(0.0, +) / Double(numbers.count)
+            let count = Double(numbers.count)
+            guard count >= 2 else { throw EvalError.div0Error }
+            let mean = try safeDivide(numbers.reduce(0.0, +), count)
             let sumSqDev = numbers.reduce(0.0) { $0 + ($1 - mean) * ($1 - mean) }
-            return .number(sumSqDev / Double(numbers.count - 1))
+            return .number(try safeDivide(sumSqDev, count - 1))
         }
     }
 
@@ -350,9 +358,10 @@ public enum BuiltinStatsFunctions {
             if let e = findFirstError(args) { throw EvalError.excelError(e) }
             let numbers = flattenNumbers(args)
             guard !numbers.isEmpty else { throw EvalError.div0Error }
-            let mean = numbers.reduce(0.0, +) / Double(numbers.count)
+            let count = Double(numbers.count)
+            let mean = try safeDivide(numbers.reduce(0.0, +), count)
             let sumSqDev = numbers.reduce(0.0) { $0 + ($1 - mean) * ($1 - mean) }
-            return .number(sumSqDev / Double(numbers.count))
+            return .number(try safeDivide(sumSqDev, count))
         }
     }
 }
