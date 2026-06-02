@@ -7,6 +7,11 @@ public final class Worksheet: @unchecked Sendable {
     public let name: String
     private(set) var cells: [String: (CellValue, CellStyle)] = [:]
     private(set) var columnWidths: [Int: Double] = [:]
+    private(set) var validations: [(range: CellRange, type: ValidationType)] = []
+    private(set) var autoFilterRange: CellRange?
+    private(set) var mergedCells: [CellRange] = []
+    private(set) var rowHeights: [Int: Double] = [:]
+    private(set) var frozenPaneRef: String?
 
     init(name: String) {
         self.name = name
@@ -64,5 +69,30 @@ public final class Worksheet: @unchecked Sendable {
     public func setColumnWidth(column: String, width: Double) {
         let ref = CellRef("\(column)1")
         columnWidths[ref.column] = width
+    }
+
+    /// Adds a data validation rule to the given cell range.
+    public func addValidation(_ range: CellRange, type: ValidationType) {
+        validations.append((range: range, type: type))
+    }
+
+    /// Enables auto-filter dropdown headers for the given range.
+    public func setAutoFilter(_ range: CellRange) {
+        autoFilterRange = range
+    }
+
+    /// Marks the given range as a merged cell region.
+    public func mergeCells(_ range: CellRange) {
+        mergedCells.append(range)
+    }
+
+    /// Sets the height of the specified row.
+    public func setRowHeight(row: Int, height: Double) {
+        rowHeights[row] = height
+    }
+
+    /// Freezes rows and columns above and to the left of the given cell reference.
+    public func freezePanes(at ref: String) {
+        frozenPaneRef = ref
     }
 }

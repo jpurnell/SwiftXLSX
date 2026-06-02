@@ -104,6 +104,15 @@ public final class Workbook: @unchecked Sendable {
         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
         """
 
+        if let frozenRef = sheet.frozenPaneRef {
+            let pane = CellRef(frozenRef)
+            let xSplit = pane.column - 1
+            let ySplit = pane.row - 1
+            xml += "<sheetViews><sheetView tabSelected=\"1\" workbookViewId=\"0\">"
+            xml += "<pane xSplit=\"\(xSplit)\" ySplit=\"\(ySplit)\" topLeftCell=\"\(frozenRef)\" activePane=\"bottomRight\" state=\"frozen\"/>"
+            xml += "</sheetView></sheetViews>"
+        }
+
         if !sheet.columnWidths.isEmpty {
             xml += "<cols>"
             for (col, width) in sheet.columnWidths.sorted(by: { $0.key < $1.key }) {
@@ -123,7 +132,13 @@ public final class Workbook: @unchecked Sendable {
 
         xml += "<sheetData>"
         for row in rowGroups.keys.sorted() {
-            xml += "<row r=\"\(row)\">"
+            var rowAttrs = "r=\"\(row)\""
+            if let height = sheet.rowHeights[row] {
+                let formatted = height.truncatingRemainder(dividingBy: 1) == 0
+                    ? String(Int(height)) : String(height)
+                rowAttrs += " ht=\"\(formatted)\" customHeight=\"1\""
+            }
+            xml += "<row \(rowAttrs)>"
             guard let cellsInRow = rowGroups[row] else { continue }
             for (ref, (value, style)) in cellsInRow {
                 let styleId = styleSheet.register(style)
@@ -172,7 +187,44 @@ public final class Workbook: @unchecked Sendable {
             }
             xml += "</row>"
         }
-        xml += "</sheetData></worksheet>"
+        xml += "</sheetData>"
+
+        if let filterRange = sheet.autoFilterRange {
+            xml += "<autoFilter ref=\"\(filterRange.reference)\"/>"
+        }
+
+        if !sheet.mergedCells.isEmpty {
+            xml += "<mergeCells count=\"\(sheet.mergedCells.count)\">"
+            for range in sheet.mergedCells {
+                xml += "<mergeCell ref=\"\(range.reference)\"/>"
+            }
+            xml += "</mergeCells>"
+        }
+
+        if !sheet.validations.isEmpty {
+            xml += "<dataValidations count=\"\(sheet.validations.count)\">"
+            for validation in sheet.validations {
+                xml += validationXML(range: validation.range, type: validation.type)
+            }
+            xml += "</dataValidations>"
+        }
+
+        xml += "</worksheet>"
         return xml
+    }
+
+    private func validationXML(range: CellRange, type: ValidationType) -> String {
+        let sqref = range.reference
+        switch type {
+        case .list(let items):
+            let joined = items.joined(separator: ",")
+            return "<dataValidation type=\"list\" sqref=\"\(sqref)\" allowBlank=\"1\"><formula1>\"\(escapeXML(joined))\"</formula1></dataValidation>"
+        case .decimal(let min, let max):
+            let minStr = min.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(min)) : String(min)
+            let maxStr = max.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(max)) : String(max)
+            return "<dataValidation type=\"decimal\" operator=\"between\" sqref=\"\(sqref)\" allowBlank=\"1\"><formula1>\(minStr)</formula1><formula2>\(maxStr)</formula2></dataValidation>"
+        case .integer(let min, let max):
+            return "<dataValidation type=\"whole\" operator=\"between\" sqref=\"\(sqref)\" allowBlank=\"1\"><formula1>\(min)</formula1><formula2>\(max)</formula2></dataValidation>"
+        }
     }
 }

@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-02
+
+### Added
+- Phase C: Layout and interactivity
+  - `Worksheet.mergeCells` — merge cell regions
+  - `Worksheet.freezePanes` — freeze rows and columns
+  - `Worksheet.setAutoFilter` — enable auto-filter dropdown headers
+  - `Worksheet.setRowHeight` — custom row heights
+  - `Worksheet.addValidation` — data validation with list, decimal, and integer constraints
+  - `ValidationType` — enum for validation rule types
+  - OOXML-compliant element ordering in worksheet XML
+
+## [0.2.0] - 2026-06-02
+
+### Changed
+- Phase B: Rich styling (breaking change to `CellStyle`)
+  - `CellStyle` rewritten as composed value type with `Font`, `Border`, `Alignment`, `NumberFormat`, `Fill`
+  - Builder pattern: `.with(font:).with(border:)` returning new immutable values
+  - `StyleSheet` rewritten to handle font/border/fill/alignment/number-format deduplication and full XML generation
+  - `DesignBundle` — configurable default styling with SF Mono / SF Pro Display defaults
+  - All existing preset names preserved (`.general`, `.header`, `.currency`, etc.)
+  - New `.title` preset (18pt bold)
+
+## [0.1.2] - 2026-06-02
+
+### Added
+- Phase A2: Formula parser (string to AST)
+  - `FormulaLexer` — character-by-character tokenizer for Excel formula strings
+  - `FormulaParser` — Pratt (precedence-climbing) parser producing `FormulaAST`
+  - `FormulaToken` — rich token type with cell refs, errors, booleans classified at lex time
+  - `FormulaParseError` — structured error with offset and formula context
+  - Full round-trip: `serialize(parse(str)) == str` for all formula patterns
+  - `Worksheet.writeFormula` upgraded from `_RAW` hack to real parsing with fallback
+  - 119 new tests (72 lexer + 82 parser + 70 round-trip + 49 integration, some shared)
+
 ## [0.1.1] - 2026-06-02
 
 ### Added
