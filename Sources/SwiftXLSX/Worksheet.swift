@@ -11,7 +11,7 @@ public final class Worksheet: @unchecked Sendable {
     }
 
     public func write(_ value: String, to ref: String, style: CellStyle = .general) {
-        cells[ref] = (.string(value), style)
+        cells[ref] = (.text(value), style)
     }
 
     public func write(_ value: Double, to ref: String, style: CellStyle = .general) {
@@ -23,7 +23,16 @@ public final class Worksheet: @unchecked Sendable {
     }
 
     public func writeFormula(_ formula: String, to ref: String, style: CellStyle = .general) {
-        cells[ref] = (.formula(formula), style)
+        let cleaned = formula.hasPrefix("=") ? String(formula.dropFirst()) : formula
+        cells[ref] = (.formula(.function("_RAW", [.text(cleaned)]), cached: nil), style)
+    }
+
+    public func write(_ formula: FormulaAST, to ref: String, style: CellStyle = .general) {
+        cells[ref] = (.formula(formula, cached: nil), style)
+    }
+
+    public func formulaAST(at ref: String) -> FormulaAST? {
+        cells[ref]?.0.formulaAST
     }
 
     public func cell(at ref: String) -> CellValue? {

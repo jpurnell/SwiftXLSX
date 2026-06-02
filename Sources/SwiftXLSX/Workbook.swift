@@ -123,7 +123,7 @@ public final class Workbook: @unchecked Sendable {
             for (ref, (value, style)) in cellsInRow {
                 let styleId = styleSheet.register(style)
                 switch value {
-                case .string(let s):
+                case .text(let s):
                     let idx = sharedStrings.index(for: s)
                     xml += "<c r=\"\(ref)\" t=\"s\" s=\"\(styleId)\"><v>\(idx)</v></c>"
                 case .number(let n):
@@ -131,12 +131,37 @@ public final class Workbook: @unchecked Sendable {
                         ? String(format: "%.0f", n)
                         : String(n)
                     xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><v>\(formatted)</v></c>"
-                case .formula(let f):
-                    let formulaBody = f.hasPrefix("=") ? String(f.dropFirst()) : f
-                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><f>\(escapeXML(formulaBody))</f></c>"
+                case .bool(let b):
+                    xml += "<c r=\"\(ref)\" t=\"b\" s=\"\(styleId)\"><v>\(b ? 1 : 0)</v></c>"
+                case .formula(let ast, let cached):
+                    let formulaBody: String
+                    if case .function("_RAW", let args) = ast,
+                       let first = args.first, case .text(let raw) = first {
+                        formulaBody = raw
+                    } else {
+                        formulaBody = FormulaSerializer.serialize(ast)
+                    }
+                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><f>\(escapeXML(formulaBody))</f>"
+                    if let cached = cached {
+                        switch cached {
+                        case .number(let n):
+                            let formatted = n.truncatingRemainder(dividingBy: 1) == 0
+                                ? String(format: "%.0f", n) : String(n)
+                            xml += "<v>\(formatted)</v>"
+                        case .text(let s):
+                            xml += "<v>\(escapeXML(s))</v>"
+                        default:
+                            break
+                        }
+                    }
+                    xml += "</c>"
+                case .error(let e):
+                    xml += "<c r=\"\(ref)\" t=\"e\" s=\"\(styleId)\"><v>\(escapeXML(e.rawValue))</v></c>"
                 case .date:
                     xml += "<c r=\"\(ref)\" s=\"\(styleId)\"/>"
                 case .blank:
+                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\"/>"
+                case .array:
                     xml += "<c r=\"\(ref)\" s=\"\(styleId)\"/>"
                 }
             }
