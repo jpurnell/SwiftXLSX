@@ -1,6 +1,6 @@
-# SwiftXLSX — Pure Swift Excel Writer
+# SwiftXLSX — Pure Swift Excel Library
 
-Zero-dependency Swift library for generating .xlsx files.
+Pure-Swift library for reading and writing .xlsx files.
 
 ## Session Start
 
@@ -14,7 +14,7 @@ Zero-dependency Swift library for generating .xlsx files.
 - Zero external dependencies — Foundation only
 - All public APIs require DocC documentation
 - All types must be Sendable
-- Write-only library — no XLSX parsing
+- Read/write library for .xlsx files
 
 ## Quality Gate
 

@@ -12,6 +12,35 @@ public final class Workbook: @unchecked Sendable {
     /// Creates an empty workbook.
     public init() {}
 
+    /// Creates a workbook by reading an existing `.xlsx` file.
+    ///
+    /// Parses the ZIP archive, extracts OOXML parts, and reconstructs
+    /// the workbook with cell values, formulas, styles, and layout features.
+    ///
+    /// - Parameter url: The `.xlsx` file URL.
+    /// - Throws: ``XLSXReadError`` if the file is invalid or cannot be parsed.
+    public convenience init(contentsOf url: URL) throws {
+        let data = try Data(contentsOf: url)
+        try self.init(xlsxData: data)
+    }
+
+    /// Creates a workbook by reading `.xlsx` data.
+    ///
+    /// - Parameter data: The raw `.xlsx` file bytes.
+    /// - Throws: ``XLSXReadError`` if the data is invalid or cannot be parsed.
+    public convenience init(xlsxData data: Data) throws {
+        self.init()
+        let parsed = try WorkbookReader.read(from: data)
+        replaceSheets(parsed.sheets)
+    }
+
+    /// Replaces the current sheets with the given array.
+    ///
+    /// Used internally by ``init(xlsxData:)`` to adopt sheets from a parsed workbook.
+    func replaceSheets(_ newSheets: [Worksheet]) {
+        sheets = newSheets
+    }
+
     /// Adds a new worksheet and returns it.
     @discardableResult
     public func addSheet(name: String) -> Worksheet {
@@ -22,6 +51,15 @@ public final class Workbook: @unchecked Sendable {
 
     /// Saves the workbook as an XLSX file at the given URL.
     public func save(to url: URL) throws {
+        let data = try save()
+        try data.write(to: url)
+    }
+
+    /// Saves the workbook as in-memory `.xlsx` data.
+    ///
+    /// - Returns: The complete `.xlsx` archive as `Data`.
+    /// - Throws: An error if the ZIP archive cannot be created.
+    public func save() throws -> Data {
         var entries: [ZIPEntry] = []
 
         entries.append(ZIPEntry(path: "[Content_Types].xml", data: Data(contentTypesXML().utf8)))
@@ -39,7 +77,7 @@ public final class Workbook: @unchecked Sendable {
         entries.append(ZIPEntry(path: "xl/styles.xml", data: Data(styleSheet.toXML().utf8)))
         entries.append(ZIPEntry(path: "xl/sharedStrings.xml", data: Data(sharedStrings.toXML().utf8)))
 
-        try SwiftZIP.ZIPWriter.write(entries: entries, to: url)
+        return try SwiftZIP.ZIPWriter.write(entries: entries)
     }
 
     // MARK: - XML Generation

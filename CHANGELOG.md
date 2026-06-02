@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-02
+
+### Added
+- Phase E: XLSX reader
+  - `Workbook(contentsOf:)` and `Workbook(xlsxData:)` — parse existing .xlsx files
+  - `Workbook.save()` — in-memory save returning Data
+  - OOXML XML parsers for workbook, worksheets, shared strings, styles, relationships
+  - Full round-trip fidelity: write → read → verify for values, formulas, styles, and layout
+  - Style reconstruction from OOXML (fonts, fills, borders, number formats, alignment)
+  - Layout feature reconstruction (freeze panes, merge cells, auto-filter, validation, row heights)
+
+## [0.4.0] - 2026-06-02
+
+### Changed
+- Phase D: SwiftZIP dependency
+  - Extracted ZIP reader/writer into standalone SwiftZIP package
+  - SwiftXLSX now depends on SwiftZIP for ZIP operations
+  - Removed internal ZIPWriter.swift
+
 ## [0.3.0] - 2026-06-02
 
 ### Added

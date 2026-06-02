@@ -17,6 +17,22 @@ public final class Worksheet: @unchecked Sendable {
         self.name = name
     }
 
+    // MARK: - Internal Mutation (Reader Support)
+
+    /// Sets a cell value and style directly by reference string.
+    ///
+    /// Used by ``WorksheetParser`` when reading cells from an XLSX file.
+    func setCell(_ ref: String, value: CellValue, style: CellStyle) {
+        cells[ref] = (value, style)
+    }
+
+    /// Sets the width of a column by its 1-based index.
+    ///
+    /// Used by ``WorksheetParser`` when reading column widths from an XLSX file.
+    func setColumnWidth(columnIndex: Int, width: Double) {
+        columnWidths[columnIndex] = width
+    }
+
     /// Writes a text value to the specified cell.
     public func write(_ value: String, to ref: String, style: CellStyle = .general) {
         cells[ref] = (.text(value), style)

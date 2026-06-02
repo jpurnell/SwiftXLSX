@@ -14,6 +14,7 @@ Pure-Swift library for generating and evaluating Excel (.xlsx) files. Zero exter
 - **Design Bundles** — configurable default styling (SF Mono, SF Pro Display, gutter columns)
 - **Layout** — merge cells, freeze panes, auto-filter, data validation, custom row heights
 - **Cell References** — A1-style with absolute/relative markers, cross-sheet references
+- **XLSX Reader** — parse existing .xlsx files back into Workbook objects
 - **Pure-Swift ZIP** — no Process/shell dependencies, works on iOS and Linux
 
 ## Quick Start
@@ -50,6 +51,11 @@ sheet.setRowHeight(row: 1, height: 40)
 
 // Save
 try workbook.save(to: URL(fileURLWithPath: "output.xlsx"))
+
+// Read an existing file
+let loaded = try Workbook(contentsOf: URL(fileURLWithPath: "input.xlsx"))
+let firstSheet = loaded.sheets[0]
+let value = firstSheet.cell(at: "A1")  // CellValue?
 ```
 
 ## Requirements

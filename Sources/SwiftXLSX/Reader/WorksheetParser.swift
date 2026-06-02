@@ -1,0 +1,312 @@
+import Foundation
+
+/// Parses an OOXML worksheet (`xl/worksheets/sheetN.xml`) into a ``Worksheet``.
+///
+/// Handles cell values (number, text via shared strings, boolean, error, formula),
+/// layout features (freeze panes, column widths, row heights, auto-filter,
+/// merged cells), and data validations (list, decimal, integer).
+final class WorksheetParser: NSObject, XMLParserDelegate {
+    private weak var sheet: Worksheet?
+    private let sharedStrings: [String]
+    private let styles: ParsedStyleSheet
+
+    // MARK: - Cell parsing state
+
+    private var currentCellRef = ""
+    private var currentCellType: String?
+    private var currentCellStyleIndex = 0
+    private var currentValue = ""
+    private var currentFormula = ""
+    private var inValue = false
+    private var inFormula = false
+    private var inCell = false
+
+    // MARK: - Row state
+
+    private var currentRow = 0
+
+    // MARK: - Data validation state
+
+    private var currentValidationSqref = ""
+    private var currentValidationType = ""
+    private var currentValidationFormula1 = ""
+    private var currentValidationFormula2 = ""
+    private var inFormula1 = false
+    private var inFormula2 = false
+    private var inDataValidation = false
+
+    // MARK: - Public API
+
+    /// Parses worksheet XML data, populating the given ``Worksheet``.
+    ///
+    /// - Parameters:
+    ///   - data: The raw XML data for this worksheet.
+    ///   - sheet: The worksheet to populate.
+    ///   - sharedStrings: The shared strings table for resolving text cells.
+    ///   - styles: The parsed style sheet for resolving cell styles.
+    static func parse(data: Data, into sheet: Worksheet,
+                      sharedStrings: [String], styles: ParsedStyleSheet) throws {
+        let handler = WorksheetParser(sheet: sheet, sharedStrings: sharedStrings, styles: styles)
+        let parser = XMLParser(data: data)
+        parser.shouldProcessNamespaces = true
+        parser.delegate = handler
+        guard parser.parse() else {
+            throw XLSXReadError.xmlParseError(
+                part: "worksheet",
+                description: parser.parserError?.localizedDescription ?? "Unknown error")
+        }
+    }
+
+    private init(sheet: Worksheet, sharedStrings: [String], styles: ParsedStyleSheet) {
+        self.sheet = sheet
+        self.sharedStrings = sharedStrings
+        self.styles = styles
+    }
+
+    // MARK: - XMLParserDelegate
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String,
+                namespaceURI: String?, qualifiedName qName: String?,
+                attributes attributeDict: [String: String] = [:]) {
+        switch elementName {
+
+        // Freeze panes
+        case "pane":
+            if attributeDict["state"] == "frozen",
+               let topLeft = attributeDict["topLeftCell"] {
+                sheet?.freezePanes(at: topLeft)
+            }
+
+        // Column widths
+        case "col":
+            if let minStr = attributeDict["min"], let min = Int(minStr),
+               let maxStr = attributeDict["max"], let max = Int(maxStr),
+               let widthStr = attributeDict["width"], let width = Double(widthStr) {
+                for col in min...max {
+                    sheet?.setColumnWidth(columnIndex: col, width: width)
+                }
+            }
+
+        // Row
+        case "row":
+            if let rStr = attributeDict["r"], let row = Int(rStr) {
+                currentRow = row
+                if let htStr = attributeDict["ht"], let height = Double(htStr) {
+                    sheet?.setRowHeight(row: row, height: height)
+                }
+            }
+
+        // Cell
+        case "c":
+            inCell = true
+            currentCellRef = attributeDict["r"] ?? ""
+            currentCellType = attributeDict["t"]
+            currentCellStyleIndex = Int(attributeDict["s"] ?? "0") ?? 0
+            currentValue = ""
+            currentFormula = ""
+
+        // Value element inside cell
+        case "v" where inCell:
+            inValue = true
+            currentValue = ""
+
+        // Formula element inside cell
+        case "f" where inCell:
+            inFormula = true
+            currentFormula = ""
+
+        // Auto-filter
+        case "autoFilter":
+            if let ref = attributeDict["ref"] {
+                sheet?.setAutoFilter(CellRange(ref))
+            }
+
+        // Merge cells
+        case "mergeCell":
+            if let ref = attributeDict["ref"] {
+                sheet?.mergeCells(CellRange(ref))
+            }
+
+        // Data validation
+        case "dataValidation":
+            inDataValidation = true
+            currentValidationSqref = attributeDict["sqref"] ?? ""
+            currentValidationType = attributeDict["type"] ?? ""
+            currentValidationFormula1 = ""
+            currentValidationFormula2 = ""
+
+        case "formula1" where inDataValidation:
+            inFormula1 = true
+            currentValidationFormula1 = ""
+
+        case "formula2" where inDataValidation:
+            inFormula2 = true
+            currentValidationFormula2 = ""
+
+        default:
+            break
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if inValue {
+            currentValue += string
+        } else if inFormula {
+            currentFormula += string
+        } else if inFormula1 {
+            currentValidationFormula1 += string
+        } else if inFormula2 {
+            currentValidationFormula2 += string
+        }
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String,
+                namespaceURI: String?, qualifiedName qName: String?) {
+        switch elementName {
+
+        case "v" where inCell:
+            inValue = false
+
+        case "f" where inCell:
+            inFormula = false
+
+        case "c":
+            commitCell()
+            inCell = false
+
+        case "formula1" where inDataValidation:
+            inFormula1 = false
+
+        case "formula2" where inDataValidation:
+            inFormula2 = false
+
+        case "dataValidation":
+            commitValidation()
+            inDataValidation = false
+
+        default:
+            break
+        }
+    }
+
+    // MARK: - Cell Commit
+
+    /// Resolves the current cell state into a ``CellValue`` and writes it to the sheet.
+    private func commitCell() {
+        guard !currentCellRef.isEmpty else { return }
+
+        let style = styles.resolve(styleIndex: currentCellStyleIndex)
+
+        // Formula cell
+        if !currentFormula.isEmpty {
+            let ast: FormulaAST
+            if let parsed = try? FormulaParser.parse(currentFormula) {
+                ast = parsed
+            } else {
+                ast = .function("_RAW", [.text(currentFormula)])
+            }
+            let cached = parseCachedValue()
+            sheet?.setCell(currentCellRef, value: .formula(ast, cached: cached), style: style)
+            return
+        }
+
+        // Determine cell value from type attribute
+        let cellValue: CellValue?
+
+        switch currentCellType {
+        case "s":
+            // Shared string reference
+            if let index = Int(currentValue) {
+                if index >= 0, index < sharedStrings.count {
+                    cellValue = .text(sharedStrings[index])
+                } else {
+                    // Out of range: use empty string
+                    cellValue = .text("")
+                }
+            } else {
+                cellValue = nil
+            }
+
+        case "b":
+            // Boolean
+            cellValue = .bool(currentValue == "1")
+
+        case "e":
+            // Error
+            if let error = ExcelError(rawValue: currentValue) {
+                cellValue = .error(error)
+            } else {
+                cellValue = .error(.value)
+            }
+
+        default:
+            // Number (no type attribute) or empty
+            if !currentValue.isEmpty {
+                if let number = Double(currentValue) {
+                    cellValue = .number(number)
+                } else {
+                    cellValue = .text(currentValue)
+                }
+            } else if currentCellStyleIndex > 0 {
+                // Empty cell with a style — record as blank
+                cellValue = .blank
+            } else {
+                cellValue = nil
+            }
+        }
+
+        if let value = cellValue {
+            sheet?.setCell(currentCellRef, value: value, style: style)
+        }
+    }
+
+    /// Parses the cached value from a formula cell's `<v>` element.
+    private func parseCachedValue() -> CellValue? {
+        guard !currentValue.isEmpty else { return nil }
+        if let number = Double(currentValue) {
+            return .number(number)
+        }
+        return .text(currentValue)
+    }
+
+    // MARK: - Validation Commit
+
+    /// Resolves the current data validation state and registers it on the sheet.
+    private func commitValidation() {
+        guard !currentValidationSqref.isEmpty else { return }
+        let range = CellRange(currentValidationSqref)
+
+        switch currentValidationType {
+        case "list":
+            let items = parseListFormula(currentValidationFormula1)
+            sheet?.addValidation(range, type: .list(items))
+
+        case "decimal":
+            let min = Double(currentValidationFormula1) ?? 0
+            let max = Double(currentValidationFormula2) ?? 0
+            sheet?.addValidation(range, type: .decimal(min: min, max: max))
+
+        case "whole":
+            let min = Int(currentValidationFormula1) ?? 0
+            let max = Int(currentValidationFormula2) ?? 0
+            sheet?.addValidation(range, type: .integer(min: min, max: max))
+
+        default:
+            break
+        }
+    }
+
+    /// Parses a list validation formula like `"Yes,No,Maybe"` into individual items.
+    ///
+    /// The OOXML format wraps list items in double quotes; this method strips
+    /// those quotes and splits by comma.
+    private func parseListFormula(_ formula: String) -> [String] {
+        var trimmed = formula.trimmingCharacters(in: .whitespaces)
+        // Remove surrounding quotes
+        if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") {
+            trimmed = String(trimmed.dropFirst().dropLast())
+        }
+        return trimmed.split(separator: ",", omittingEmptySubsequences: false)
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+    }
+}
