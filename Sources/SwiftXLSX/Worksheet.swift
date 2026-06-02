@@ -6,6 +6,9 @@ public final class Worksheet: @unchecked Sendable {
     /// The name of this worksheet.
     public let name: String
     private(set) var cells: [String: (CellValue, CellStyle)] = [:]
+
+    /// The reference strings of all non-empty cells in this worksheet.
+    public var cellReferences: [String] { Array(cells.keys) }
     private(set) var columnWidths: [Int: Double] = [:]
     private(set) var validations: [(range: CellRange, type: ValidationType)] = []
     private(set) var autoFilterRange: CellRange?
