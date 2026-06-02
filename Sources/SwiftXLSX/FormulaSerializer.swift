@@ -1,7 +1,9 @@
+/// Converts a ``FormulaAST`` into an Excel formula string.
 public enum FormulaSerializer {
 
     // MARK: - Public API
 
+    /// Serializes the given AST node into a formula string (without leading `=`).
     public static func serialize(_ ast: FormulaAST) -> String {
         serializeNode(ast)
     }

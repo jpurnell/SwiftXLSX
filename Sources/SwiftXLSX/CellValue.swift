@@ -1,5 +1,6 @@
 import Foundation
 
+/// A unified cell value type matching Excel's value semantics.
 public enum CellValue: Equatable, Hashable, Sendable {
     case number(Double)
     case text(String)
@@ -10,6 +11,7 @@ public enum CellValue: Equatable, Hashable, Sendable {
     case blank
     indirect case array([CellValue])
 
+    /// The resolved value; returns cached value for formulas, self otherwise.
     public var resolved: CellValue {
         switch self {
         case .formula(_, let cached):
@@ -19,11 +21,13 @@ public enum CellValue: Equatable, Hashable, Sendable {
         }
     }
 
+    /// Whether this value is a formula.
     public var isFormula: Bool {
         if case .formula = self { return true }
         return false
     }
 
+    /// The formula AST if this is a formula value, nil otherwise.
     public var formulaAST: FormulaAST? {
         if case .formula(let ast, _) = self { return ast }
         return nil

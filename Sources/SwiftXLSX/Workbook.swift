@@ -1,13 +1,17 @@
 import Foundation
 
+/// An Excel workbook containing one or more worksheets.
+// Justification: Workbook is only mutated during construction, before save
 public final class Workbook: @unchecked Sendable {
-    // Justification: Workbook is only mutated during construction, before save
+    /// The worksheets in this workbook.
     public private(set) var sheets: [Worksheet] = []
     let sharedStrings = SharedStrings()
     let styleSheet = StyleSheet()
 
+    /// Creates an empty workbook.
     public init() {}
 
+    /// Adds a new worksheet and returns it.
     @discardableResult
     public func addSheet(name: String) -> Worksheet {
         let sheet = Worksheet(name: name)
@@ -15,6 +19,7 @@ public final class Workbook: @unchecked Sendable {
         return sheet
     }
 
+    /// Saves the workbook as an XLSX file at the given URL.
     public func save(to url: URL) throws {
         var entries: [(path: String, data: Data)] = []
 
@@ -128,7 +133,7 @@ public final class Workbook: @unchecked Sendable {
                     xml += "<c r=\"\(ref)\" t=\"s\" s=\"\(styleId)\"><v>\(idx)</v></c>"
                 case .number(let n):
                     let formatted = n.truncatingRemainder(dividingBy: 1) == 0
-                        ? String(format: "%.0f", n)
+                        ? String(Int(n))
                         : String(n)
                     xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><v>\(formatted)</v></c>"
                 case .bool(let b):
@@ -146,7 +151,7 @@ public final class Workbook: @unchecked Sendable {
                         switch cached {
                         case .number(let n):
                             let formatted = n.truncatingRemainder(dividingBy: 1) == 0
-                                ? String(format: "%.0f", n) : String(n)
+                                ? String(Int(n)) : String(n)
                             xml += "<v>\(formatted)</v>"
                         case .text(let s):
                             xml += "<v>\(escapeXML(s))</v>"

@@ -1,9 +1,11 @@
+/// Manages cell styles for an XLSX workbook.
+// Justification: StyleSheet is only mutated during workbook construction, before save
 public final class StyleSheet: @unchecked Sendable {
-    // Justification: StyleSheet is only mutated during workbook construction, before save
     private var styles: [CellStyle] = [.general]
     private var fonts: [(bold: Bool, size: Double)] = [(false, 11)]
     private var fills: [String?] = [nil, nil] // 0=none, 1=gray125 (required by Excel)
 
+    /// Registers a cell style and returns its index.
     public func register(_ style: CellStyle) -> Int {
         if let existing = styles.firstIndex(where: {
             $0.numberFormatId == style.numberFormatId
@@ -36,6 +38,7 @@ public final class StyleSheet: @unchecked Sendable {
         return fills.count - 1
     }
 
+    /// Generates the styles XML.
     public func toXML() -> String {
         var xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
