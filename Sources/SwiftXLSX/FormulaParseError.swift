@@ -48,5 +48,8 @@ public struct FormulaParseError: Error, Equatable, Sendable {
 
         /// The formula string was empty or contained only whitespace.
         case emptyFormula // LIVE: public API for consumers
+
+        /// The formula is too deeply nested.
+        case formulaTooComplex // LIVE: public API for consumers
     }
 }

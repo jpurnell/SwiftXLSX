@@ -77,6 +77,8 @@ private struct TokenParser {
     let tokens: [FormulaToken]
     let formula: String
     var position: Int = 0
+    var depth: Int = 0
+    private static let maxDepth = 256
 
     /// The token at the current position.
     var currentToken: FormulaToken {
@@ -180,6 +182,12 @@ private struct TokenParser {
     /// - Parameter minPrecedence: The minimum binding power required.
     /// - Returns: The parsed ``FormulaAST``.
     mutating func parseExpression(minPrecedence: Int = 0) throws -> FormulaAST {
+        guard depth < Self.maxDepth else {
+            throw FormulaParseError(kind: .formulaTooComplex, offset: position, formula: formula)
+        }
+        depth += 1
+        defer { depth -= 1 }
+
         if currentToken == .eof && minPrecedence == 0 {
             throw FormulaParseError(kind: .emptyFormula, offset: 0, formula: formula)
         }
@@ -200,6 +208,13 @@ private struct TokenParser {
 
     /// Parses a prefix expression (atom, unary operator, or parenthesized group).
     mutating func parsePrefix() throws -> FormulaAST {
+        guard currentToken != .eof else {
+            throw FormulaParseError(
+                kind: .unexpectedEnd(expected: "expression"),
+                offset: position,
+                formula: formula
+            )
+        }
         let token = currentToken
 
         switch token {
@@ -247,13 +262,6 @@ private struct TokenParser {
             try expect(.rightParen)
             return expr
 
-        case .eof:
-            throw FormulaParseError(
-                kind: .unexpectedEnd(expected: "expression"),
-                offset: position,
-                formula: formula
-            )
-
         default:
             throw FormulaParseError(
                 kind: .unexpectedToken(
@@ -293,6 +301,7 @@ private struct TokenParser {
     /// After consuming an `.identifier`, dispatches to function call, sheet
     /// reference, or named range based on the next token.
     private mutating func parseIdentifier(_ name: String) throws -> FormulaAST {
+        guard currentToken != .eof else { return .namedRange(name) }
         switch currentToken {
         case .leftParen:
             return try parseFunctionCall(name)
@@ -307,6 +316,13 @@ private struct TokenParser {
 
     /// Parses a function call: `NAME(arg1, arg2, ...)`.
     private mutating func parseFunctionCall(_ name: String) throws -> FormulaAST {
+        guard currentToken == .leftParen else {
+            throw FormulaParseError(
+                kind: .unexpectedToken(expected: "(", found: describeToken(currentToken)),
+                offset: position,
+                formula: formula
+            )
+        }
         try expect(.leftParen)
         var args: [FormulaAST] = []
 

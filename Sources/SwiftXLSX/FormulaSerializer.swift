@@ -5,7 +5,7 @@ public enum FormulaSerializer {
 
     /// Serializes the given AST node into a formula string (without leading `=`).
     public static func serialize(_ ast: FormulaAST) -> String {
-        serializeNode(ast)
+        serializeNode(ast, depth: 0)
     }
 
     // MARK: - Precedence
@@ -30,9 +30,12 @@ public enum FormulaSerializer {
         }
     }
 
+    private static let maxDepth = 256
+
     // MARK: - Serialization
 
-    private static func serializeNode(_ ast: FormulaAST) -> String {
+    private static func serializeNode(_ ast: FormulaAST, depth: Int) -> String {
+        guard depth < maxDepth else { return "#VALUE!" }
         switch ast {
         case .cellRef(let ref):
             return ref.reference
@@ -52,36 +55,36 @@ public enum FormulaSerializer {
             return e.rawValue
 
         case .add(let left, let right):
-            return serializeBinary(ast, left, "+", right, rightAssociative: false)
+            return serializeBinary(ast, left, "+", right, rightAssociative: false, depth: depth)
         case .subtract(let left, let right):
-            return serializeBinary(ast, left, "-", right, rightAssociative: true)
+            return serializeBinary(ast, left, "-", right, rightAssociative: true, depth: depth)
         case .multiply(let left, let right):
-            return serializeBinary(ast, left, "*", right, rightAssociative: false)
+            return serializeBinary(ast, left, "*", right, rightAssociative: false, depth: depth)
         case .divide(let left, let right):
-            return serializeBinary(ast, left, "/", right, rightAssociative: true)
+            return serializeBinary(ast, left, "/", right, rightAssociative: true, depth: depth)
         case .power(let left, let right):
-            return serializeBinary(ast, left, "^", right, rightAssociative: false)
+            return serializeBinary(ast, left, "^", right, rightAssociative: false, depth: depth)
         case .concatenate(let left, let right):
-            return serializeBinary(ast, left, "&", right, rightAssociative: false)
+            return serializeBinary(ast, left, "&", right, rightAssociative: false, depth: depth)
 
         case .negate(let expr):
-            return serializeNegate(expr)
+            return serializeNegate(expr, depth: depth)
 
         case .equal(let left, let right):
-            return serializeBinary(ast, left, "=", right, rightAssociative: false)
+            return serializeBinary(ast, left, "=", right, rightAssociative: false, depth: depth)
         case .notEqual(let left, let right):
-            return serializeBinary(ast, left, "<>", right, rightAssociative: false)
+            return serializeBinary(ast, left, "<>", right, rightAssociative: false, depth: depth)
         case .greaterThan(let left, let right):
-            return serializeBinary(ast, left, ">", right, rightAssociative: false)
+            return serializeBinary(ast, left, ">", right, rightAssociative: false, depth: depth)
         case .lessThan(let left, let right):
-            return serializeBinary(ast, left, "<", right, rightAssociative: false)
+            return serializeBinary(ast, left, "<", right, rightAssociative: false, depth: depth)
         case .greaterOrEqual(let left, let right):
-            return serializeBinary(ast, left, ">=", right, rightAssociative: false)
+            return serializeBinary(ast, left, ">=", right, rightAssociative: false, depth: depth)
         case .lessOrEqual(let left, let right):
-            return serializeBinary(ast, left, "<=", right, rightAssociative: false)
+            return serializeBinary(ast, left, "<=", right, rightAssociative: false, depth: depth)
 
         case .function(let name, let args):
-            let argStrings = args.map { serializeNode($0) }
+            let argStrings = args.map { serializeNode($0, depth: depth + 1) }
             return "\(name)(\(argStrings.joined(separator: ",")))"
         }
     }
@@ -91,11 +94,13 @@ public enum FormulaSerializer {
         _ left: FormulaAST,
         _ op: String,
         _ right: FormulaAST,
-        rightAssociative: Bool
+        rightAssociative: Bool,
+        depth: Int
     ) -> String {
+        guard depth < maxDepth else { return "#VALUE!" }
         let parentPrec = precedence(of: parent)
-        let leftStr = parenthesizeChild(left, parentPrecedence: parentPrec, isRightChild: false, rightAssociative: false)
-        let rightStr = parenthesizeChild(right, parentPrecedence: parentPrec, isRightChild: true, rightAssociative: rightAssociative)
+        let leftStr = parenthesizeChild(left, parentPrecedence: parentPrec, isRightChild: false, rightAssociative: false, depth: depth)
+        let rightStr = parenthesizeChild(right, parentPrecedence: parentPrec, isRightChild: true, rightAssociative: rightAssociative, depth: depth)
         return "\(leftStr)\(op)\(rightStr)"
     }
 
@@ -103,8 +108,10 @@ public enum FormulaSerializer {
         _ child: FormulaAST,
         parentPrecedence: Int,
         isRightChild: Bool,
-        rightAssociative: Bool
+        rightAssociative: Bool,
+        depth: Int
     ) -> String {
+        guard depth < maxDepth else { return "#VALUE!" }
         let childPrec = precedence(of: child)
         let needsParens: Bool
         if childPrec < parentPrecedence {
@@ -115,13 +122,14 @@ public enum FormulaSerializer {
             needsParens = false
         }
 
-        let serialized = serializeNode(child)
+        let serialized = serializeNode(child, depth: depth + 1)
         return needsParens ? "(\(serialized))" : serialized
     }
 
-    private static func serializeNegate(_ expr: FormulaAST) -> String {
+    private static func serializeNegate(_ expr: FormulaAST, depth: Int) -> String {
+        guard depth < maxDepth else { return "#VALUE!" }
         let exprPrec = precedence(of: expr)
-        let serialized = serializeNode(expr)
+        let serialized = serializeNode(expr, depth: depth + 1)
         if exprPrec < precedence(of: .negate(expr)) {
             return "-(\(serialized))"
         }
