@@ -10,7 +10,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
-        .package(path: "../SwiftZIP"),
+        .package(url: "https://github.com/jpurnell/SwiftZIP.git", from: "0.5.0"),
     ],
     targets: [
         .target(
