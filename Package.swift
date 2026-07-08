@@ -1,4 +1,5 @@
 // swift-tools-version: 6.2
+// legibility:description: Pure-Swift library for generating and evaluating Excel (.xlsx) files.
 
 import PackageDescription
 
