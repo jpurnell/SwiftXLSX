@@ -695,7 +695,7 @@ When the timer expires (or the user taps Stop), `TrainingViewModel.stop()` (line
 
 **Patent:** US 9,521,976 B2 — "Method and Apparatus for Encouraging Physiological Change Through Physiological Control of Wearable Auditory and Visual Interruption Device"  
 **Inventor:** Devon Greco | **Filed:** 2014-01-24 | **Granted:** 2016-12-20  
-**Full text:** `development-guidelines/project/library/Patent/US9521976.pdf`
+**Full text:** `project/library/Patent/US9521976.pdf`
 
 The patent contains 51 claims organized into two parallel groups: **system claims** (1–28) and **method claims** (29–51). The method claims mirror the system claims as process steps. The table below maps every claim to the codebase, grouped by functional area.
 

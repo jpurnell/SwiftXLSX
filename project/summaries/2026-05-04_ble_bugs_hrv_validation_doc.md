@@ -31,7 +31,7 @@
 
 ### 2.3 Apple Watch HRV Validation Document — Major Revision
 
-**File:** `development-guidelines/project/docs/technical/APPLE_WATCH_HIGH_RES_HEARTRATE.md`
+**File:** `project/docs/technical/APPLE_WATCH_HIGH_RES_HEARTRATE.md`
 
 Three rounds of revision after reading the actual source papers (O'Grady et al. 2024, Lambe et al. 2026, Bonneval et al. 2025):
 
@@ -64,7 +64,7 @@ Canonical locations:
 
 ### 2.5 Implementation Checklist Updated
 
-**File:** `development-guidelines/project/checklists/CURRENT_ble_edge_scanner.md`
+**File:** `project/checklists/CURRENT_ble_edge_scanner.md`
 
 Updated from "BLOCKED on two issues" to "READY FOR ON-DEVICE BLE TEST — all blockers resolved, launch verified sub-second." All three blocker sections marked resolved with details.
 

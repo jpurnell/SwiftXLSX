@@ -44,7 +44,7 @@ Fix the broken ConnectView-to-TrainingView device wiring so BLE devices can flow
 - All `String(format:)` eliminated across NarbisKit + NarbisUI (7 occurrences)
 
 ### Design Proposals Written
-5 design proposals drafted and saved to `development-guidelines/project/plans/proposals/`:
+5 design proposals drafted and saved to `project/plans/proposals/`:
 1. **PROPOSAL_connectview_wiring.md** — APPROVED, implemented this session
 2. **PROPOSAL_sound_design.md** — DRAFT, harmonics + envelope + pink noise
 3. **PROPOSAL_ble_hr_scanner.md** — DRAFT, CoreBluetooth 0x180D scanner

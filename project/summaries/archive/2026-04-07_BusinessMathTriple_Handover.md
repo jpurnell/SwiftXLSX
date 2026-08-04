@@ -105,7 +105,7 @@ BusinessMath interpolation upstream work.
 - narbis local copy synced
 
 ### quality-gate-swift design proposal filed
-- `/Users/jpurnell/.../Tools/quality-gate-swift/development-guidelines/project/plans/upcoming/StringFormatDetection.md`
+- `/Users/jpurnell/.../Tools/quality-gate-swift/project/plans/upcoming/StringFormatDetection.md`
 - Detailed spec for adding `c-style-format-string` detection to the existing `SafetyAuditor` module
 - 18 specified tests, ~310 LoC estimate
 - Ready for an implementing instance to pick up cold and execute
