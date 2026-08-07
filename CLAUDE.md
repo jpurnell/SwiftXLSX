@@ -5,8 +5,8 @@ Pure-Swift library for reading and writing .xlsx files.
 ## Session Start
 
 1. `project/master_plan.md` — Architecture
-2. `development-guidelines/project/checklists/CURRENT_*.md` — Active tasks
-3. Latest in `development-guidelines/project/summaries/` — Where we left off
+2. `project/checklists/CURRENT_*.md` — Active tasks
+3. Latest in `project/summaries/` — Where we left off
 
 ## Key Rules
 
