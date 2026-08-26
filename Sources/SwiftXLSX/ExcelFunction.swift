@@ -10,7 +10,8 @@ import Foundation
 /// let abs = ExcelFunction(
 ///     name: "ABS", minArgs: 1, maxArgs: 1
 /// ) { args in
-///     // ...
+///     guard case .number(let n) = args[0] else { return .error(.value) }
+///     return .number(Swift.abs(n))
 /// }
 /// ```
 public struct ExcelFunction: Sendable {

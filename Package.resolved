@@ -1,5 +1,5 @@
 {
-  "originHash" : "b20a5b0680c27ea8c489c96fec43517ab98284684b832f8cca063afa994ebce5",
+  "originHash" : "59d211efbca2b568990f58a3b39a484f43401fedc5b62efb68b03e726a517dea",
   "pins" : [
     {
       "identity" : "swift-docc-plugin",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftZIP.git",
       "state" : {
-        "revision" : "7fa8643b5c492c7a4d9ec53a0edd19166b61bb18",
-        "version" : "0.5.0"
+        "revision" : "ad2116716cd447eed989305f0ca98ff40a3cddc2",
+        "version" : "0.3.0"
       }
     }
   ],

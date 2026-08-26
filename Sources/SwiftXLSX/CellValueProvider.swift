@@ -37,6 +37,8 @@ public protocol CellValueProvider: Sendable {
 /// Use this provider to resolve cell references during formula evaluation.
 ///
 /// ```swift
+/// let wb = Workbook()
+/// _ = wb.addSheet(name: "Sheet1")
 /// let provider = WorkbookValueProvider(workbook: wb, currentSheet: "Sheet1")
 /// let val = provider.value(at: CellRef("A1"))
 /// ```

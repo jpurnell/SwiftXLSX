@@ -5,8 +5,7 @@
 /// semantics (including `^`, which differs from the mathematical convention).
 ///
 /// ```swift
-/// let tokens: [FormulaToken] = [.cellRef(CellRef("A1")), .plus, .number(1), .eof]
-/// let ast = try FormulaParser.parseTokens(tokens)
+/// let ast = try FormulaParser.parse("=A1+1")
 /// // ast == .add(.cellRef(CellRef("A1")), .number(1))
 /// ```
 public enum FormulaParser {

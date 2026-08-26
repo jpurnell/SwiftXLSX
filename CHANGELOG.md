@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Added
+- DocC catalogue (`Sources/SwiftXLSX/SwiftXLSX.docc`) curating all 44 public types
+  into eight topic groups; declared as a target resource so SwiftPM stops reporting
+  it as an unhandled file.
+
+### Changed
+- SwiftZIP dependency requirement relaxed from `0.5.0` to `0.3.0`. No `0.5.0` tag
+  exists — the previously pinned revision left SwiftZIP's history during a refactor,
+  taking the tag with it, so resolution failed outright. Every SwiftZIP API used here
+  (`ZIPReader.read`, `ZIPReader.readEntry`, `ZIPWriter.write`) is present in 0.3.0.
+- `WorkbookTests` reads archives with `SwiftZIP.ZIPReader` instead of spawning
+  `/usr/bin/unzip` via `Process`. Removes the external binary dependency from the
+  test suite and drops those tests from ~0.150s to ~0.010s.
+- `LOG(number, base)` states its float comparison as `!base.isEqual(to: 1)` rather
+  than `!=`. Behaviour is unchanged: only exactly 1.0 is rejected, matching Excel,
+  which returns very large values for bases merely near 1.
+- Doc-comment examples on 13 public symbols now compile. They previously referenced
+  undefined values (`registry`, `wb`, `myProvider`, `myResolver`), returned `()` where
+  a `CellValue` was required, or called the internal `FormulaParser.parseTokens`.
+- README no longer claims "zero external dependencies"; it names the SwiftZIP
+  dependency and states what is actually true (no C or system libraries, no shelling out).
+
+### Fixed
+- Force unwrap in `WorkbookTests.testWriteFormula` replaced with `XCTUnwrap`.
+- `.quality-gate.yml` used two keys this gate version does not recognise
+  (`checkers`, `exclude`), so the configuration was silently inert and five checkers
+  never ran. `checkers` is now `enabledCheckers`; the `exclude: [disk-clean]` entry was
+  removed because `disk-clean` is no longer a checker at all — it moved to the
+  `quality-gate clean` subcommand.
+
 ## [0.5.0] - 2026-06-02
 
 ### Added

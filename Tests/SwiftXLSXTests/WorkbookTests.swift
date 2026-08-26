@@ -1,6 +1,7 @@
 import XCTest
 @testable import SwiftXLSX
 import Foundation
+import SwiftZIP
 
 final class WorkbookTests: XCTestCase {
 
@@ -46,13 +47,12 @@ final class WorkbookTests: XCTestCase {
         XCTAssertEqual(value, .number(1_950_000))
     }
 
-    func testWriteFormula() {
+    func testWriteFormula() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Test")
         sheet.writeFormula("=B1*0.2", to: "B2")
-        let value = sheet.cell(at: "B2")
-        XCTAssertNotNil(value)
-        XCTAssertTrue(value!.isFormula)
+        let value = try XCTUnwrap(sheet.cell(at: "B2"))
+        XCTAssertTrue(value.isFormula)
     }
 
     func testWriteInteger() {
@@ -87,10 +87,11 @@ final class WorkbookTests: XCTestCase {
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("test_\(UUID().uuidString).xlsx")
+            .standardizedFileURL
         defer { try? FileManager.default.removeItem(at: url) }
 
         try wb.save(to: url)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertTrue(try url.checkResourceIsReachable())
     }
 
     func testSavedFileIsZIP() throws {
@@ -122,18 +123,9 @@ final class WorkbookTests: XCTestCase {
 
         try wb.save(to: url)
 
-        // Unzip and check required files exist
-        let unzipDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("unzip_\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: unzipDir) }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", url.path, "-d", unzipDir.path]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
+        // Read the archive directly rather than extracting it: the entry names are
+        // what this test is about, and nothing needs to touch the filesystem.
+        let entryPaths = Set(try SwiftZIP.ZIPReader.read(from: url).map(\.path))
 
         let requiredFiles = [
             "[Content_Types].xml",
@@ -145,11 +137,7 @@ final class WorkbookTests: XCTestCase {
             "xl/sharedStrings.xml",
         ]
         for file in requiredFiles {
-            let filePath = unzipDir.appendingPathComponent(file).path
-            XCTAssertTrue(
-                FileManager.default.fileExists(atPath: filePath),
-                "Missing required file: \(file)"
-            )
+            XCTAssertTrue(entryPaths.contains(file), "Missing required file: \(file)")
         }
     }
 
@@ -165,29 +153,21 @@ final class WorkbookTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         try wb.save(to: url)
 
-        let unzipDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("unzip_\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: unzipDir) }
+        let entries = try SwiftZIP.ZIPReader.read(from: url)
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", url.path, "-d", unzipDir.path]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
-
-        let sheetXML = try String(
-            contentsOf: unzipDir.appendingPathComponent("xl/worksheets/sheet1.xml"),
-            encoding: .utf8
+        let sheetEntry = try XCTUnwrap(
+            entries.first { $0.path == "xl/worksheets/sheet1.xml" },
+            "Missing xl/worksheets/sheet1.xml"
         )
+        let sheetXML = try XCTUnwrap(String(data: sheetEntry.data, encoding: .utf8))
         XCTAssertTrue(sheetXML.contains("<v>500000"), "Should contain numeric value")
         XCTAssertTrue(sheetXML.contains("B1*2"), "Should contain formula")
 
-        let stringsXML = try String(
-            contentsOf: unzipDir.appendingPathComponent("xl/sharedStrings.xml"),
-            encoding: .utf8
+        let stringsEntry = try XCTUnwrap(
+            entries.first { $0.path == "xl/sharedStrings.xml" },
+            "Missing xl/sharedStrings.xml"
         )
+        let stringsXML = try XCTUnwrap(String(data: stringsEntry.data, encoding: .utf8))
         XCTAssertTrue(stringsXML.contains("Revenue"), "Shared strings should contain 'Revenue'")
     }
 }
