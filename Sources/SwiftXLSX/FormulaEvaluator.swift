@@ -7,10 +7,14 @@ import Foundation
 /// via a ``FunctionRegistry``.
 ///
 /// ```swift
+/// let wb = Workbook()
+/// _ = wb.addSheet(name: "Sheet1")
+/// let cells = WorkbookValueProvider(workbook: wb, currentSheet: "Sheet1")
+/// let names = NamedRangeCollection()
 /// let result = try FormulaEvaluator.evaluate(
 ///     .add(.number(1), .number(2)),
-///     cells: myProvider,
-///     names: myResolver
+///     cells: cells,
+///     names: names
 /// )
 /// // result == .number(3)
 /// ```

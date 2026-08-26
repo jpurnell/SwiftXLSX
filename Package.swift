@@ -11,7 +11,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
-        .package(url: "https://github.com/jpurnell/SwiftZIP.git", from: "0.5.0"),
+        .package(url: "https://github.com/jpurnell/SwiftZIP.git", from: "0.3.0"),
     ],
     targets: [
         .target(
@@ -19,7 +19,8 @@ let package = Package(
             dependencies: [
                 .product(name: "SwiftZIP", package: "SwiftZIP"),
             ],
-            path: "Sources/SwiftXLSX"
+            path: "Sources/SwiftXLSX",
+            resources: [.process("SwiftXLSX.docc")]
         ),
         .testTarget(
             name: "SwiftXLSXTests",

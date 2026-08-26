@@ -1,7 +1,7 @@
-exclude:
-  - disk-clean
-
-checkers:
+# `disk-clean` used to be listed under `exclude:` here. It is no longer a checker
+# at all — it moved to the `quality-gate clean` subcommand because it mutates the
+# tree — so the exclusion referred to nothing and was dropped rather than renamed.
+enabledCheckers:
   - all
   - logging
 

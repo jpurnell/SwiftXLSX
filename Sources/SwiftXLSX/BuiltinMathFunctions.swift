@@ -8,6 +8,7 @@ import Foundation
 ///
 /// Register all functions at once via ``all``:
 /// ```swift
+/// var registry = FunctionRegistry()
 /// for fn in BuiltinMathFunctions.all {
 ///     registry.register(fn)
 /// }
@@ -171,7 +172,10 @@ public enum BuiltinMathFunctions {
                 return .number(Foundation.log10(number))
             }
             let base = try toNumber(args[1])
-            guard base > 0, base != 1 else { throw EvalError.numError }
+            // Exact IEEE 754 comparison, deliberately: only base 1.0 makes log(base) exactly
+            // zero and the division below undefined. Excel likewise rejects 1 alone, returning
+            // very large values for bases merely near it, so an epsilon band would be wrong.
+            guard base > 0, !base.isEqual(to: 1) else { throw EvalError.numError }
             return .number(Foundation.log(number) / Foundation.log(base))
         }
     }

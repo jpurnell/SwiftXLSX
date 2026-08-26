@@ -4,6 +4,7 @@
 /// in a workbook, detect circular references, and query dependency relationships.
 ///
 /// ```swift
+/// let wb = Workbook()
 /// let graph = DependencyGraph(workbook: wb)
 /// for cell in graph.evaluationOrder {
 ///     // evaluate in dependency order

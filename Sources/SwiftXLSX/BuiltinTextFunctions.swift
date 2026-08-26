@@ -7,6 +7,7 @@ import Foundation
 ///
 /// Register all functions at once via ``all``:
 /// ```swift
+/// var registry = FunctionRegistry()
 /// for fn in BuiltinTextFunctions.all {
 ///     registry.register(fn)
 /// }

@@ -180,10 +180,20 @@ let val = wb.sheets[0].cell(at: "B1")  // .number(1_500_000.0)
 - [x] Workbook convenience initializers: `init(contentsOf:)`, `init(xlsxData:)`
 - [x] Round-trip tests (write -> read -> verify)
 
+### Documentation (Complete)
+- [x] DocC catalogue at `Sources/SwiftXLSX/SwiftXLSX.docc`, declared as a target resource
+- [x] All 44 public types curated into eight topic groups; no uncurated leftovers
+- [x] Doc-comment examples compile — they are checked by the gate, not just rendered
+
 ### Quality
 - 48 source files, 48 test files, ~1400 tests
 - Zero warnings target
 - All public types are Sendable
+- Quality gate green at 45/45 checkers, 0 errors / 0 warnings, with no overrides,
+  suppressions, or checker exclusions. The gate config previously used two
+  unrecognised keys, so five checkers silently never ran; corrected 2026-08-25.
+- Test suite spawns no subprocesses: archive assertions go through SwiftZIP rather
+  than `/usr/bin/unzip`.
 
 ---
 
@@ -209,4 +219,6 @@ its defined scope. Future work is driven by consumer needs:
 
 ---
 
-*Last updated: 2026-06-02*
+*Last updated: 2026-08-25 -- reconciled the dependency claim (README had said "zero
+external dependencies"; SwiftZIP has always been a dependency, as this plan already
+stated), recorded the DocC catalogue, and noted the quality-gate config correction.*

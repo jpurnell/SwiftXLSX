@@ -1,6 +1,7 @@
 # SwiftXLSX
 
-Pure-Swift library for generating and evaluating Excel (.xlsx) files. Zero external dependencies.
+Pure-Swift library for generating and evaluating Excel (.xlsx) files. No C or system-library
+dependencies, and nothing shells out to an external binary.
 
 ## Features
 
@@ -62,6 +63,9 @@ let value = firstSheet.cell(at: "A1")  // CellValue?
 
 - Swift 6.2+
 - macOS 14+ / iOS 17+
+
+The only package dependency is [SwiftZIP](https://github.com/jpurnell/SwiftZIP) (pure Swift),
+which provides the ZIP reader and writer. `swift-docc-plugin` is a build-time plugin only.
 
 ## License
 

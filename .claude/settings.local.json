@@ -64,8 +64,8 @@
       "WebFetch(domain:webcache.googleusercontent.com)",
       "WebSearch",
       "Bash(ls:*)",
-      "Bash(textutil -convert txt -stdout \"/Users/jpurnell/Desktop/How NASA Built Artemis II's Fault-Tolerant Computer – Communications of the ACM.webarchive\")",
-      "Bash(plutil -convert xml1 -o - \"/Users/jpurnell/Desktop/How NASA Built Artemis II's Fault-Tolerant Computer – Communications of the ACM.webarchive\")",
+      "Bash(textutil -convert txt -stdout \"/Users/jpurnell/Desktop/How NASA Built Artemis II's Fault-Tolerant Computer \u2013 Communications of the ACM.webarchive\")",
+      "Bash(plutil -convert xml1 -o - \"/Users/jpurnell/Desktop/How NASA Built Artemis II's Fault-Tolerant Computer \u2013 Communications of the ACM.webarchive\")",
       "Bash(python3:*)",
       "Bash(wc -l /Users/jpurnell/Dropbox/Computer/Development/Swift/Playgrounds/Math/BusinessMath/Sources/BusinessMath/**/*.swift)",
       "Bash(grep \"\\\\.md$\")",
@@ -82,7 +82,10 @@
       "Bash(git count-objects *)",
       "Bash(git stash *)",
       "Bash(git ls-tree *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(git ls-remote *)",
+      "Read(//Users/jpurnell/Dropbox/Computer/Development/Swift/**)",
+      "Read(//usr/local/custom/bin/**)"
     ]
   }
 }
