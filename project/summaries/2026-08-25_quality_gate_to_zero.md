@@ -54,9 +54,28 @@ again after the mechanism changed to `ZIPReader`.
 45/45 checkers, 0 errors, 0 warnings, no overrides. Institutional consistency 0.50 → 1.00.
 1395 XCTest + 44 swift-testing tests pass.
 
-## Open item, not addressed here
+## Follow-on: SwiftZIP 0.6.0 released, SwiftXLSX raised to it
 
-The local SwiftZIP clone at `Tools/SwiftZIP` is **one commit ahead of origin/main**, holding
-unpushed zlib/gzip read features. SwiftXLSX does not use them. If those are wanted downstream,
-tag and push a real SwiftZIP release and raise this requirement to match — deliberately,
-this time.
+SwiftZIP is developed at `Tools/SwiftZIP` (it is the canonical repo, not a checkout). It held
+two unreleased feature commits — the gzip and zlib readers — so 0.6.0 was cut and pushed, and
+this package's requirement raised from the interim `0.3.0` to `0.6.0`.
+
+**Version numbering:** 0.4.0 and 0.5.0 are retired and will not be published. 0.5.0 is burned
+(its tag was deleted and the commit is gone); 0.4.0 would sort *below* it, so any surviving
+`from: "0.5.0"` pin would still resolve to nothing. 0.6.0 is unambiguously past the gap.
+
+**The same latent failure was found there.** SwiftZIP's gate config did not enable the full
+checker set, so `doc-run` and `doc-comment-code` had never run: its DocC article trapped at
+runtime on `ZIPError.truncatedArchive` (it read `Data()` as an archive — empty `Data` is a
+*truncated* archive, not an empty one), and five doc-comment examples did not compile. Both
+packages now set `enabledCheckers: [all]`. **If another package in this org has a default
+checker selection, assume its doc examples are broken until proven otherwise.**
+
+**Two quality-gate quirks worth remembering:**
+- `quality-gate release` reports `release.version-mismatch` against *its own* CLI version
+  (3.1.0) rather than the project's, in both packages and regardless of `--tag`. It is a tool
+  bug, not a project defect. Do not invent a version constant to satisfy it.
+- `release-readiness` errors when the README advertises a version whose tag does not exist
+  yet — which is unavoidable while preparing the tagging commit. Create the tag first so the
+  pre-commit hook runs against real content, then move the (still unpushed) tag onto the
+  release commit.

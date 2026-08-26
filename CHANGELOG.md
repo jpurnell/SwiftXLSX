@@ -8,10 +8,14 @@
   it as an unhandled file.
 
 ### Changed
-- SwiftZIP dependency requirement relaxed from `0.5.0` to `0.3.0`. No `0.5.0` tag
-  exists — the previously pinned revision left SwiftZIP's history during a refactor,
-  taking the tag with it, so resolution failed outright. Every SwiftZIP API used here
-  (`ZIPReader.read`, `ZIPReader.readEntry`, `ZIPWriter.write`) is present in 0.3.0.
+- SwiftZIP dependency now requires `0.6.0`, a real published release. The manifest
+  previously required `0.5.0`, a tag that has never existed: the revision
+  `Package.resolved` had pinned under that version left SwiftZIP's history during a
+  refactor, taking the tag with it, so resolution failed outright. It was first
+  corrected to `0.3.0` (the only surviving tag, and sufficient — every SwiftZIP API
+  used here is present in it), then raised to `0.6.0` once that release was cut.
+  SwiftZIP skipped `0.4.0` and `0.5.0` on purpose so no version string is ever reused
+  for different content.
 - `WorkbookTests` reads archives with `SwiftZIP.ZIPReader` instead of spawning
   `/usr/bin/unzip` via `Process`. Removes the external binary dependency from the
   test suite and drops those tests from ~0.150s to ~0.010s.
