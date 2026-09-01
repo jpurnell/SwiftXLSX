@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-01
+
+Reading a workbook this library did not write now works. Until this release it did
+not, for any file Excel produced, and it failed by returning an empty workbook rather
+than an error.
+
 ### Fixed
 - **The reader could not open any workbook Excel writes.** `WorkbookReader` located the
   main document part with `type.contains("officeDocument")`. Several OOXML relationship
