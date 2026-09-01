@@ -1,5 +1,10 @@
 # Changelog
 
+> **Tags are `vX.Y.Z` as of 2026-09-01.** Every tag through 0.7.0 was recreated in that form on
+> its original commit and the unprefixed tags removed. Commits are unchanged, and SwiftPM treats
+> `v0.7.0` and `0.7.0` as the same version, so `exact: "0.7.0"` in a consumer's manifest keeps
+> resolving to the same revision. Version *numbers* in this file remain unprefixed.
+
 ## [Unreleased]
 
 ## [0.7.0] - 2026-09-01
