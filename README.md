@@ -15,7 +15,7 @@ dependencies, and nothing shells out to an external binary.
 - **Design Bundles** — configurable default styling (SF Mono, SF Pro Display, gutter columns)
 - **Layout** — merge cells, freeze panes, auto-filter, data validation, custom row heights
 - **Cell References** — A1-style with absolute/relative markers, cross-sheet references
-- **XLSX Reader** — parse existing .xlsx files back into Workbook objects
+- **XLSX Reader** — parse existing .xlsx files back into Workbook objects, including packages written by Excel (fixed in 0.6.0; earlier releases returned an empty workbook for those)
 - **Pure-Swift ZIP** — no Process/shell dependencies, works on iOS and Linux
 
 ## Quick Start
