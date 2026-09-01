@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Fixed
+- **The reader could not open any workbook Excel writes.** `WorkbookReader` located the
+  main document part with `type.contains("officeDocument")`. Several OOXML relationship
+  types live under the `.../officeDocument/2006/relationships/` namespace, so that
+  substring also matches `.../relationships/extended-properties` — which Excel lists
+  *first* in `_rels/.rels`. The reader therefore selected `docProps/app.xml`, which is
+  well-formed XML containing no `<sheet>` elements, and returned a workbook with **zero
+  sheets and no error**. Now matched by exact type: only the main document part ends in
+  `/officeDocument`.
+
+  Every existing reader test round-tripped through this library's own writer, whose
+  `_rels/.rels` happens to list the workbook relationship first, so the entire test
+  suite passed against a reader that could not open a real spreadsheet. `Tests/
+  SwiftXLSXTests/ForeignWorkbookReadTests.swift` closes that gap by assembling packages
+  shaped the way Excel shapes them, rather than the way we do.
+- Relationship targets are resolved rather than concatenated. A package-absolute target
+  (`/xl/workbook.xml`) was appended to the workbook directory, producing `xl//xl/...`,
+  which matches no ZIP entry; `.` and `..` segments were not collapsed at all. Both forms
+  are legal OOXML. `WorkbookReader.resolvePart(_:relativeTo:)` now handles the three
+  shapes a target can take.
+
 ### Added
 - DocC catalogue (`Sources/SwiftXLSX/SwiftXLSX.docc`) curating all 44 public types
   into eight topic groups; declared as a target resource so SwiftPM stops reporting

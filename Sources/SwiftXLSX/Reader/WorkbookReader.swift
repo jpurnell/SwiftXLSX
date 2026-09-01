@@ -34,9 +34,17 @@ enum WorkbookReader {
         } else {
             topRels = []
         }
-        let workbookPath = topRels.first {
-            $0.type.contains("officeDocument")
+        // Match the relationship type exactly, not by substring. Several OOXML
+        // relationship types live under the `.../officeDocument/2006/relationships/`
+        // namespace, so a `contains("officeDocument")` test also matches
+        // `.../relationships/extended-properties` — which Excel writes *first*.
+        // That selects `docProps/app.xml`, which is well-formed XML containing no
+        // `<sheet>` elements, so the workbook parses to zero sheets and the read
+        // succeeds silently. Only the main-document type ends in `/officeDocument`.
+        let workbookTarget = topRels.first {
+            $0.type.hasSuffix("/officeDocument")
         }?.target ?? "xl/workbook.xml"
+        let workbookPath = resolvePart(workbookTarget, relativeTo: "")
 
         // 3. Parse xl/_rels/workbook.xml.rels to map rIds to sheet paths
         let wbRelsPath: String
@@ -87,11 +95,11 @@ enum WorkbookReader {
             let rel = wbRels.first { $0.id == info.rId }
             let relTarget = rel?.target ?? "worksheets/sheet\(info.sheetId).xml"
 
-            // Resolve relative path against workbook directory
+            // Resolve the target against the workbook's own directory
             let wbDir = workbookPath.contains("/")
                 ? workbookPath.components(separatedBy: "/").dropLast().joined(separator: "/")
                 : ""
-            let sheetPath = wbDir.isEmpty ? relTarget : "\(wbDir)/\(relTarget)"
+            let sheetPath = resolvePart(relTarget, relativeTo: wbDir)
 
             guard let sheetData = entryMap[sheetPath] else {
                 continue  // Skip sheets with missing data rather than failing
@@ -102,5 +110,51 @@ enum WorkbookReader {
         }
 
         return workbook
+    }
+
+    /// Resolves an OOXML relationship target to a ZIP entry path.
+    ///
+    /// Targets come in three legal shapes and only one of them is a plain
+    /// concatenation:
+    ///
+    /// - **Package-absolute** (`/xl/workbook.xml`) — relative to the package root,
+    ///   so the base is discarded rather than prepended.
+    /// - **Relative** (`worksheets/sheet1.xml`) — joined onto the base.
+    /// - **Relative with traversal** (`../xl/workbook.xml`) — joined, then the
+    ///   `.` and `..` segments are collapsed.
+    ///
+    /// ZIP entry paths carry no leading slash, so the result never has one.
+    ///
+    /// - Parameters:
+    ///   - target: The relationship's `Target` attribute.
+    ///   - base: The directory the target is relative to, without a trailing
+    ///     slash. Empty means the package root.
+    /// - Returns: A normalized path suitable for looking up a ZIP entry.
+    static func resolvePart(_ target: String, relativeTo base: String) -> String {
+        let joined: String
+        if target.hasPrefix("/") {
+            joined = String(target.dropFirst())
+        } else if base.isEmpty {
+            joined = target
+        } else {
+            joined = "\(base)/\(target)"
+        }
+
+        guard joined.contains("./") || joined.hasSuffix("/.") || joined.hasSuffix("/..") else {
+            return joined
+        }
+
+        var resolved: [String] = []
+        for segment in joined.components(separatedBy: "/") {
+            switch segment {
+            case "", ".":
+                continue
+            case "..":
+                if !resolved.isEmpty { resolved.removeLast() }
+            default:
+                resolved.append(segment)
+            }
+        }
+        return resolved.joined(separator: "/")
     }
 }

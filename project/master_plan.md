@@ -179,6 +179,11 @@ let val = wb.sheets[0].cell(at: "B1")  // .number(1_500_000.0)
 - [x] WorkbookReader orchestrates full read pipeline
 - [x] Workbook convenience initializers: `init(contentsOf:)`, `init(xlsxData:)`
 - [x] Round-trip tests (write -> read -> verify)
+- [x] Foreign-package tests (read packages this library did not write) — added 2026-09-01
+      after the reader was found unable to open any Excel-authored workbook: the main
+      document part was matched by substring, which also matches extended-properties,
+      so real files parsed to zero sheets and returned no error. Round-trip tests could
+      not catch it, because our own writer emits the one relationship ordering that works.
 
 ### Documentation (Complete)
 - [x] DocC catalogue at `Sources/SwiftXLSX/SwiftXLSX.docc`, declared as a target resource
@@ -186,7 +191,7 @@ let val = wb.sheets[0].cell(at: "B1")  // .number(1_500_000.0)
 - [x] Doc-comment examples compile — they are checked by the gate, not just rendered
 
 ### Quality
-- 48 source files, 48 test files, ~1400 tests
+- 48 source files, 49 test files, ~1404 tests
 - Zero warnings target
 - All public types are Sendable
 - Quality gate green at 45/45 checkers, 0 errors / 0 warnings, with no overrides,
