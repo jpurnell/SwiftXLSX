@@ -191,7 +191,7 @@ let val = wb.sheets[0].cell(at: "B1")  // .number(1_500_000.0)
 - [x] Doc-comment examples compile — they are checked by the gate, not just rendered
 
 ### Quality
-- 48 source files, 49 test files, ~1404 tests
+- 49 source files, 49 test files, ~1414 tests
 - Zero warnings target
 - All public types are Sendable
 - Quality gate green at 45/45 checkers, 0 errors / 0 warnings, with no overrides,

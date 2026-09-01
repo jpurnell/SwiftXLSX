@@ -2,7 +2,7 @@
 
 **Purpose:** Scannable inventory of what this project can do — feature areas, key types, external interfaces, and application domains.
 
-**Last reviewed:** 2026-09-01
+**Last reviewed:** 2026-09-01 (reviewed again for 0.7.0)
 
 > **Format reference:** See `development-guidelines/rules/capability_map.md` for field definitions,
 > naming conventions, and maintenance rules.
@@ -25,6 +25,13 @@
 Reads packages written by Excel as of 0.6.0. Earlier releases resolved the main document part
 by substring match and returned an empty workbook for any Excel-authored file — see the
 `ForeignWorkbookReadTests` suite, which reads packages this library did not write.
+
+Recovers shared formulas and data tables as of 0.7.0. Excel stores a repeated formula once on its
+group's master cell and a What-If table as a single element naming its span; both leave the other
+cells' `<f>` elements empty. Before 0.7.0 those cells fell through to their cached values and read
+as constants. The invariant now held and tested: **a cell carrying an `<f>` element is a formula
+cell, never a bare value.** A formula that cannot be parsed is marked `_RAW`, an unresolvable
+shared group `_SHARED`, and a data table `_DATATABLE` — visible rather than silent.
 
 ## Formula Representation
 

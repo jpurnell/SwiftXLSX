@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-01
+
+Formula cells written by Excel are now read as formulas. Until this release, a cell whose formula
+was stored elsewhere in the file — which is how Excel stores most repeated formulas — was read as
+the constant Excel had cached in it.
+
+### Fixed
+- **Shared formulas were silently read as constants.** Excel writes a repeated formula once, on
+  its group's master cell, as `<f t="shared" ref="B2:B4" si="0">A2*2</f>`; every other member
+  carries only `<f t="shared" si="0"/>` with no text, its formula being the master's with relative
+  references shifted by the offset between them. `WorksheetParser` had no `t="shared"` handling,
+  so those cells fell past the empty `<f>` to their cached `<v>` and became `.number`.
+
+  On the Wharton LBO Practice Model this was **81 of 155 formula cells on one sheet** — computed
+  cells posing as inputs, with no error and no warning. Substituting a cached result for a formula
+  is the exact failure this library's consumers are built to avoid, and it was happening in the
+  reader.
+
+  Members met before their master are held and resolved when the sheet ends, so document order
+  does not matter. A group whose master never appears is marked `_SHARED` rather than falling back
+  to a value.
+- **What-If data tables were silently read as constants**, by the same mechanism:
+  `<f t="dataTable" ref="P6:T10" r1="D11" r2="D21"/>` is self-closing and carries no text. Now
+  read as `_DATATABLE(span, input1, input2)`, preserving the span and input cells that identify
+  the table.
+
+### Added
+- `SharedFormula.translate(_:rowDelta:columnDelta:)` — shifts relative references and pins
+  absolute ones, the rule Excel applies when filling a formula. References shifted off the sheet
+  become `#REF!`, matching Excel.
+- `ForeignWorkbookReadTests` gains shared-formula and data-table coverage: translation across rows
+  and columns, absolute references staying pinned, ranges translating as units, and the master
+  keeping its own formula.
+
+### Known gaps
+- Percent literals do not lex: `=P5+2%` parses as `_RAW`. Eight cells on the Wharton model. Loud
+  rather than silent, so the formula-cell invariant holds, but the formula is not usable.
+
 ## [0.6.0] - 2026-09-01
 
 Reading a workbook this library did not write now works. Until this release it did

@@ -21,6 +21,21 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
     private var inFormula = false
     private var inCell = false
 
+    // MARK: - Shared formula state
+
+    /// A shared formula's text lives only on its group's master cell, keyed by `si`.
+    private var sharedFormulaMasters: [Int: (origin: CellRef, ast: FormulaAST)] = [:]
+
+    /// Group members met before their master. Resolved once the document ends.
+    private var pendingSharedCells: [(reference: String, index: Int,
+                                      cached: CellValue?, style: CellStyle)] = []
+
+    private var currentFormulaType: String?
+    private var currentSharedIndex: Int?
+
+    /// A data table's span and input cells, from the `<f t="dataTable">` attributes.
+    private var currentDataTable: (span: String, inputs: [CellRef])?
+
     // MARK: - Row state
 
     private var currentRow = 0
@@ -104,6 +119,9 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
             currentCellStyleIndex = Int(attributeDict["s"] ?? "0") ?? 0
             currentValue = ""
             currentFormula = ""
+            currentFormulaType = nil
+            currentSharedIndex = nil
+            currentDataTable = nil
 
         // Value element inside cell
         case "v" where inCell:
@@ -114,6 +132,12 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
         case "f" where inCell:
             inFormula = true
             currentFormula = ""
+            currentFormulaType = attributeDict["t"]
+            currentSharedIndex = attributeDict["si"].flatMap { Int($0) }
+            if attributeDict["t"] == "dataTable" {
+                let inputs = ["r1", "r2"].compactMap { attributeDict[$0] }.map { CellRef($0) }
+                currentDataTable = (span: attributeDict["ref"] ?? "", inputs: inputs)
+            }
 
         // Auto-filter
         case "autoFilter":
@@ -189,6 +213,37 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
         }
     }
 
+    // MARK: - Shared Formula Resolution
+
+    func parserDidEndDocument(_ parser: XMLParser) {
+        for cell in pendingSharedCells {
+            let target = CellRef(cell.reference)
+            let ast: FormulaAST
+            if let master = sharedFormulaMasters[cell.index] {
+                ast = derive(from: master, at: target)
+            } else {
+                // No master anywhere in the sheet: the group is unresolvable. Say so
+                // rather than letting the cell pose as data, matching the `_RAW`
+                // convention used for a formula that will not parse.
+                ast = .function("_SHARED", [.number(Double(cell.index))])
+            }
+            sheet?.setCell(
+                cell.reference, value: .formula(ast, cached: cell.cached), style: cell.style)
+        }
+        pendingSharedCells.removeAll()
+    }
+
+    /// Shifts a group master's formula onto one of its member cells.
+    private func derive(
+        from master: (origin: CellRef, ast: FormulaAST), at target: CellRef
+    ) -> FormulaAST {
+        SharedFormula.translate(
+            master.ast,
+            rowDelta: target.row - master.origin.row,
+            columnDelta: target.column - master.origin.column
+        )
+    }
+
     // MARK: - Cell Commit
 
     /// Resolves the current cell state into a ``CellValue`` and writes it to the sheet.
@@ -206,8 +261,47 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
             } else {
                 ast = .function("_RAW", [.text(currentFormula)])
             }
+            if currentFormulaType == "shared", let index = currentSharedIndex {
+                sharedFormulaMasters[index] = (CellRef(currentCellRef), ast)
+            }
             let cached = parseCachedValue()
             sheet?.setCell(currentCellRef, value: .formula(ast, cached: cached), style: style)
+            return
+        }
+
+        // A What-If data table. Excel writes the whole table as one self-closing
+        // formula element naming its span and the input cells it varies, with no
+        // formula text — so it fails exactly as a shared-formula member does, and
+        // the table would otherwise read as a grid of unexplained constants.
+        if let table = currentDataTable {
+            let arguments: [FormulaAST] = [.text(table.span)] + table.inputs.map { .cellRef($0) }
+            sheet?.setCell(
+                currentCellRef,
+                value: .formula(.function("_DATATABLE", arguments), cached: parseCachedValue()),
+                style: style
+            )
+            return
+        }
+
+        // A shared-formula group member. Its `<f>` element is empty: the formula
+        // belongs to the group's master and has to be shifted onto this cell. It
+        // is still a formula cell, so it must never fall through to the cached
+        // value below — that would turn a computed cell into a constant silently.
+        if currentFormulaType == "shared", let index = currentSharedIndex {
+            let cached = parseCachedValue()
+            if let master = sharedFormulaMasters[index] {
+                sheet?.setCell(
+                    currentCellRef,
+                    value: .formula(
+                        derive(from: master, at: CellRef(currentCellRef)), cached: cached),
+                    style: style
+                )
+            } else {
+                // The master follows this cell in document order. Hold it and
+                // resolve when the sheet is fully read.
+                pendingSharedCells.append(
+                    (reference: currentCellRef, index: index, cached: cached, style: style))
+            }
             return
         }
 
