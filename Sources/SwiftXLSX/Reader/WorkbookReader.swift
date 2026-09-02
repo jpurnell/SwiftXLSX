@@ -68,7 +68,7 @@ enum WorkbookReader {
         guard let wbData = entryMap[workbookPath] else {
             throw XLSXReadError.missingPart(workbookPath)
         }
-        let (sheetInfos, _) = try WorkbookXMLParser.parse(data: wbData)
+        let (sheetInfos, definedNameInfos) = try WorkbookXMLParser.parse(data: wbData)
 
         // 5. Parse xl/sharedStrings.xml (optional -- might not exist if no text cells)
         let sharedStrings: [String]
@@ -88,6 +88,11 @@ enum WorkbookReader {
 
         // 7. For each sheet, resolve its file path and parse
         let workbook = Workbook()
+        for info in definedNameInfos {
+            guard let named = DefinedNameResolver.namedRange(from: info, sheets: sheetInfos)
+            else { continue }
+            workbook.adopt(named)
+        }
         for info in sheetInfos {
             let sheet = workbook.addSheet(name: info.name)
 

@@ -17,8 +17,8 @@
 
 ## Workbook Reading
 
-**Key types:** `WorkbookReader`, `WorksheetParser`, `StyleSheetParser`, `SharedStringsParser`, `WorkbookXMLParser`, `RelationshipsParser`, `ContentTypesParser`, `XLSXReadError`
-**Interfaces:** `Workbook(contentsOf:)`, `Workbook(xlsxData:)`
+**Key types:** `WorkbookReader`, `WorksheetParser`, `StyleSheetParser`, `SharedStringsParser`, `WorkbookXMLParser`, `RelationshipsParser`, `ContentTypesParser`, `DefinedNameResolver`, `XLSXReadError`
+**Interfaces:** `Workbook(contentsOf:)`, `Workbook(xlsxData:)`, `Workbook.namedRanges`
 **Applications:** Ingesting spreadsheets authored elsewhere, round-tripping a workbook through code, recovering a model from a file
 **Dependencies:** SwiftZIP
 
@@ -32,6 +32,11 @@ cells' `<f>` elements empty. Before 0.7.0 those cells fell through to their cach
 as constants. The invariant now held and tested: **a cell carrying an `<f>` element is a formula
 cell, never a bare value.** A formula that cannot be parsed is marked `_RAW`, an unresolvable
 shared group `_SHARED`, and a data table `_DATATABLE` — visible rather than silent.
+
+Recovers named ranges as of 0.8.0. `xl/workbook.xml` was parsed for defined names from the start
+and the result discarded twice — at the parse call and again in `Workbook.init(xlsxData:)`. A
+`.namedRange` in a formula was therefore unresolvable, not merely inconvenient, and models route
+their most important single values through named ranges.
 
 ## Formula Representation
 

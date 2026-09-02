@@ -7,6 +7,36 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-02
+
+Named ranges survive the read. `xl/workbook.xml` has been parsed for defined names since the
+reader was written, and the result was thrown away twice over — once at the parse call
+(`let (sheetInfos, _) = ...`) and again in `Workbook.init(xlsxData:)`, which adopted only the
+sheets. A formula referring to a named range therefore reached callers as
+`FormulaAST.namedRange("Circ")` with nothing on the public API to look `Circ` up in, which makes
+the reference unresolvable rather than merely inconvenient.
+
+Real models lean on named ranges for exactly the values a reader most wants: switches, rates,
+and the single cell a whole model keys off. The Wharton LBO practice model routes its
+circularity toggle through one, and a consumer could read every formula in that workbook without
+being able to say what any of them meant.
+
+### Added
+- `Workbook.namedRanges`: the file's names as a `NamedRangeCollection`. Empty for a workbook this
+  library built, since the writer defines none.
+
+No new type: `NamedRange`, `NamedRangeTarget`, `NameScope`, and `NamedRangeCollection` have been
+here since 0.1.0 for the authoring side, and the read side now produces the same values the
+write side consumes. A reader-only `DefinedName` would have been a second name for one idea.
+
+A name's target is parsed into `.sheetCell` or `.sheetRange` where the file states a reference.
+Excel permits any formula there, so anything else is kept verbatim as `.formula(.text(…))` —
+a name whose target cannot be parsed is still a name, and what the file said beats a cell
+invented for it. Scope comes from `localSheetId`, which is an index into the sheets rather than
+a name; resolution is `NamedRangeCollection`'s, so a sheet-scoped name takes precedence over a
+workbook-scoped one of the same spelling. Excel's own `_xlnm.` page-setup entries are kept
+rather than filtered, leaving the caller to decide what to ignore.
+
 ## [0.7.0] - 2026-09-01
 
 Formula cells written by Excel are now read as formulas. Until this release, a cell whose formula

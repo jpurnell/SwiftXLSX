@@ -6,6 +6,19 @@ import SwiftZIP
 public final class Workbook: @unchecked Sendable {
     /// The worksheets in this workbook.
     public private(set) var sheets: [Worksheet] = []
+
+    /// The workbook's named ranges.
+    ///
+    /// Empty for a workbook this library built, since the writer defines no names.
+    /// Populated when reading a file that has them, so a
+    /// ``FormulaAST/namedRange(_:)`` can be resolved to what it points at —
+    /// without this the reference is unresolvable rather than inconvenient, and
+    /// models route their most important single values through named ranges.
+    ///
+    /// Resolution is ``NamedRangeCollection``'s: case-insensitive, with a
+    /// sheet-scoped name taking precedence over a workbook-scoped one of the same
+    /// spelling.
+    public private(set) var namedRanges = NamedRangeCollection()
     let sharedStrings = SharedStrings()
     let styleSheet = StyleSheet()
 
@@ -32,6 +45,7 @@ public final class Workbook: @unchecked Sendable {
         self.init()
         let parsed = try WorkbookReader.read(from: data)
         replaceSheets(parsed.sheets)
+        namedRanges = parsed.namedRanges
     }
 
     /// Replaces the current sheets with the given array.
@@ -39,6 +53,13 @@ public final class Workbook: @unchecked Sendable {
     /// Used internally by ``init(xlsxData:)`` to adopt sheets from a parsed workbook.
     func replaceSheets(_ newSheets: [Worksheet]) {
         sheets = newSheets
+    }
+
+    /// Records a named range read from a file.
+    ///
+    /// - Parameter range: The named range to record.
+    func adopt(_ range: NamedRange) {
+        namedRanges.add(range)
     }
 
     /// Adds a new worksheet and returns it.

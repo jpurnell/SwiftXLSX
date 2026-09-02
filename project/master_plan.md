@@ -224,6 +224,7 @@ its defined scope. Future work is driven by consumer needs:
 
 ---
 
-*Last updated: 2026-08-25 -- reconciled the dependency claim (README had said "zero
-external dependencies"; SwiftZIP has always been a dependency, as this plan already
-stated), recorded the DocC catalogue, and noted the quality-gate config correction.*
+*Last updated: 2026-09-02 -- recorded 0.8.0: named ranges survive the read. `xl/workbook.xml`
+was parsed for defined names from the start and the result discarded twice, so a `.namedRange`
+in a formula was unresolvable. The read side now produces the `NamedRange` values the write
+side has consumed since 0.1.0, rather than a second type for one idea.*
