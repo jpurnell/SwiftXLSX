@@ -7,6 +7,20 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-02
+
+A cell's presentation survives the read. The reader has resolved each cell's style since it was
+written — Excel's built-in number formats included, so `numFmtId="9"` arrives as `0%` — and then
+stored it where no caller could reach it: `Worksheet.cells` is internal and `private(set)`, and
+nothing else exposed a style.
+
+The format is not decoration. It is often the only statement a workbook makes about what a number
+*is*: `0.4` in a cell formatted `0%` is a margin, the same `0.4` formatted `"$"#,##0` is money,
+and the label beside it may say neither.
+
+### Added
+- `Worksheet.style(at:)`: the `CellStyle` applied to a cell, or `nil` when the cell holds nothing.
+
 ## [0.8.0] - 2026-09-02
 
 Named ranges survive the read. `xl/workbook.xml` has been parsed for defined names since the

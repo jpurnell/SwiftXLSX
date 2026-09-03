@@ -18,7 +18,7 @@
 ## Workbook Reading
 
 **Key types:** `WorkbookReader`, `WorksheetParser`, `StyleSheetParser`, `SharedStringsParser`, `WorkbookXMLParser`, `RelationshipsParser`, `ContentTypesParser`, `DefinedNameResolver`, `XLSXReadError`
-**Interfaces:** `Workbook(contentsOf:)`, `Workbook(xlsxData:)`, `Workbook.namedRanges`
+**Interfaces:** `Workbook(contentsOf:)`, `Workbook(xlsxData:)`, `Workbook.namedRanges`, `Worksheet.style(at:)`
 **Applications:** Ingesting spreadsheets authored elsewhere, round-tripping a workbook through code, recovering a model from a file
 **Dependencies:** SwiftZIP
 
@@ -37,6 +37,10 @@ Recovers named ranges as of 0.8.0. `xl/workbook.xml` was parsed for defined name
 and the result discarded twice — at the parse call and again in `Workbook.init(xlsxData:)`. A
 `.namedRange` in a formula was therefore unresolvable, not merely inconvenient, and models route
 their most important single values through named ranges.
+
+Exposes cell styles as of 0.9.0. Styles were resolved on read from the start, built-in number
+formats included, and kept where no caller could reach them. A number format is frequently the
+only statement a file makes about what a value means.
 
 ## Formula Representation
 

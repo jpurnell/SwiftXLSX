@@ -79,6 +79,21 @@ public final class Worksheet: @unchecked Sendable {
         cells[ref]?.0.formulaAST
     }
 
+    /// The style applied to a cell, or `nil` when the cell holds nothing.
+    ///
+    /// A cell's number format is not decoration. It is often the only statement a
+    /// workbook makes about what a number *is*: `0.4` formatted `0%` is a margin,
+    /// the same `0.4` formatted `"$"#,##0` is money, and the label beside it may
+    /// say neither. The reader has resolved this for every cell since it was
+    /// written — Excel's built-in formats included, so `numFmtId="9"` arrives as
+    /// `0%` — and it had nowhere to go.
+    ///
+    /// - Parameter ref: The cell reference, such as `B4`.
+    /// - Returns: The cell's style, or `nil` if the cell is empty.
+    public func style(at ref: String) -> CellStyle? {
+        cells[ref]?.1
+    }
+
     /// Returns the cell value at the given reference, if any.
     public func cell(at ref: String) -> CellValue? {
         cells[ref]?.0

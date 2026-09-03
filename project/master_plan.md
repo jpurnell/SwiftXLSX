@@ -224,7 +224,6 @@ its defined scope. Future work is driven by consumer needs:
 
 ---
 
-*Last updated: 2026-09-02 -- recorded 0.8.0: named ranges survive the read. `xl/workbook.xml`
-was parsed for defined names from the start and the result discarded twice, so a `.namedRange`
-in a formula was unresolvable. The read side now produces the `NamedRange` values the write
-side has consumed since 0.1.0, rather than a second type for one idea.*
+*Last updated: 2026-09-02 -- recorded 0.8.0 (named ranges survive the read) and 0.9.0
+(`Worksheet.style(at:)`). Both were the same shape of gap: the reader had already parsed the
+information and kept it where no caller could reach it.*
