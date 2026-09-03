@@ -69,7 +69,32 @@ public final class Worksheet: @unchecked Sendable {
         }
     }
 
+    /// Writes a formula together with the value Excel last computed for it.
+    ///
+    /// A formula cell in a real workbook carries both — the rule in `<f>` and the
+    /// last result in `<v>` — and until now the writer could only say the first.
+    /// A `Workbook` built in code therefore could not be made to look like one
+    /// read from disk, which is exactly what a test of the reader's own shapes
+    /// needs: a data table's body is cached numbers under a single marker, and a
+    /// cached value is sometimes the only evidence of what a formula produced.
+    ///
+    /// - Parameters:
+    ///   - formula: The formula.
+    ///   - ref: The cell reference, such as `B4`.
+    ///   - cached: The value the formula last evaluated to.
+    ///   - style: The cell style to apply.
+    public func write(
+        _ formula: FormulaAST, to ref: String, cached: CellValue, style: CellStyle = .general
+    ) {
+        cells[ref] = (.formula(formula, cached: cached), style)
+    }
+
     /// Writes a formula AST to the specified cell.
+    ///
+    /// - Parameters:
+    ///   - formula: The formula.
+    ///   - ref: The cell reference, such as `B4`.
+    ///   - style: The cell style to apply.
     public func write(_ formula: FormulaAST, to ref: String, style: CellStyle = .general) {
         cells[ref] = (.formula(formula, cached: nil), style)
     }

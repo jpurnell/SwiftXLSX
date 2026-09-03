@@ -224,6 +224,7 @@ its defined scope. Future work is driven by consumer needs:
 
 ---
 
-*Last updated: 2026-09-02 -- recorded 0.8.0 (named ranges survive the read) and 0.9.0
-(`Worksheet.style(at:)`). Both were the same shape of gap: the reader had already parsed the
-information and kept it where no caller could reach it.*
+*Last updated: 2026-09-03 -- recorded 0.10.0 (`write(_:to:cached:style:)`), after 0.8.0
+(named ranges) and 0.9.0 (cell styles). All three were the same shape: information the reader
+understood, with no way for a caller to reach or state it. This one is the writer's half —
+a workbook built in code could not be made to look like one read from disk.*

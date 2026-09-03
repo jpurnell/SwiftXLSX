@@ -18,7 +18,7 @@
 ## Workbook Reading
 
 **Key types:** `WorkbookReader`, `WorksheetParser`, `StyleSheetParser`, `SharedStringsParser`, `WorkbookXMLParser`, `RelationshipsParser`, `ContentTypesParser`, `DefinedNameResolver`, `XLSXReadError`
-**Interfaces:** `Workbook(contentsOf:)`, `Workbook(xlsxData:)`, `Workbook.namedRanges`, `Worksheet.style(at:)`
+**Interfaces:** `Workbook(contentsOf:)`, `Workbook(xlsxData:)`, `Workbook.namedRanges`, `Worksheet.style(at:)`, `Worksheet.write(_:to:cached:style:)`
 **Applications:** Ingesting spreadsheets authored elsewhere, round-tripping a workbook through code, recovering a model from a file
 **Dependencies:** SwiftZIP
 
@@ -41,6 +41,10 @@ their most important single values through named ranges.
 Exposes cell styles as of 0.9.0. Styles were resolved on read from the start, built-in number
 formats included, and kept where no caller could reach them. A number format is frequently the
 only statement a file makes about what a value means.
+
+Writes a formula with its cached value as of 0.10.0, so a workbook built in code can be made to
+look like one read from disk — which is what a test of the reader's own shapes needs, a data
+table's body being cached numbers under a single marker.
 
 ## Formula Representation
 

@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-03
+
+A formula can be written with the value it last computed. The reader has always surfaced both —
+the rule in `<f>` and the result in `<v>` — and the writer could only ever say the first, so a
+`Workbook` built in code could not be made to look like one read from disk.
+
+That matters most for tests of the reader's own shapes. A data table's body is cached numbers
+under a single marker; a shared formula's dependents are cached values with empty `<f>` elements.
+Anything exercising those had no way to build a fixture without a real file.
+
+The third gap of this shape after 0.8.0 and 0.9.0: information the reader understood, with no way
+for a caller to state it.
+
+### Added
+- `Worksheet.write(_:to:cached:style:)`: a formula and the value Excel last computed for it. The
+  existing overload is unchanged and still writes no cached value.
+
 ## [0.9.0] - 2026-09-02
 
 A cell's presentation survives the read. The reader has resolved each cell's style since it was
