@@ -12,7 +12,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
         .package(url: "https://github.com/jpurnell/SwiftZIP.git", from: "0.6.0"),
-        .package(path: "../SwiftExcelCore"),
+        .package(url: "https://github.com/jpurnell/SwiftExcelCore", exact: "0.1.0"),
     ],
     targets: [
         .target(
