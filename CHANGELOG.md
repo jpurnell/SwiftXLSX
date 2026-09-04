@@ -7,6 +7,35 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-04
+
+**The function library moved to SwiftExcelFunctions.** This package is now syntax and storage:
+lexer, parser, serializer, reader, writer, styles, and the dependency graph.
+
+### Removed
+- The 73 built-in Excel functions across the eight `Builtin*Functions` files.
+- `FunctionRegistry`, `ExcelFunction`, `FormulaEvaluator`, `EvalError`.
+
+They are in [SwiftExcelFunctions](https://github.com/jpurnell/SwiftExcelFunctions), which depends
+on SwiftExcelCore and BusinessMath. A caller that evaluated formulas through this package adds
+that dependency and imports it; a caller that reads and writes files needs no change.
+
+**Not re-exported, unlike the 0.12.0 extraction.** That one moved types this package still
+traffics in, so `import SwiftXLSX` had to keep seeing them. These leave outright: a file reader
+has no business owning what `AVERAGE` means, and a re-export would preserve the old shape while
+claiming the new one.
+
+### Changed
+- `FormulaParserIntegrationTests` moved to SwiftExcelFunctions. Its 49 cases parse a formula here
+  and evaluate it there, so it belongs with the evaluator and takes a test-only dependency back on
+  this package for the parser.
+
+### Notes
+- 722 tests here, 546 there. The 1,268 split with none lost.
+- Verified before removing: nothing else in this package referenced them, SwiftZIP is a dependency
+  of this package rather than a consumer, and BusinessMathExcel's references are all to
+  BusinessMath's unrelated generic `FormulaEvaluator<Double>`.
+
 ## [0.12.0] - 2026-09-04
 
 **The spreadsheet vocabulary moved to SwiftExcelCore.** `CellValue`, `CellRef`, `CellRange`,
