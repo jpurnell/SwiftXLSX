@@ -144,6 +144,69 @@ final class DependencyGraphScopeTests: XCTestCase {
         XCTAssertEqual(graph.cycles.count, 1)
     }
 
+    // MARK: - Absolute and mixed references
+
+    /// A `$` says how a formula *fills*, not which cell it means.
+    ///
+    /// `CellRef` hashes its markers, so `$C12` and `C12` are different values. Left
+    /// alone, a graph splits on that: the unfiltered build mints a phantom node for
+    /// the marked form, and the filtered build drops the edge entirely, because the
+    /// sheet's own key is the plain form and the marked one is not in scope.
+    ///
+    /// Neither is a small error. Mixed references are how a model fills a rule
+    /// across a row while holding one operand still, so the edges lost are the ones
+    /// tying every period back to its assumptions.
+    func testAMixedReferenceIsTheSameCell() {
+        let book = Workbook()
+        let sheet = book.addSheet(name: "Model")
+        sheet.write(2.0, to: "C12")
+        sheet.write(10.0, to: "C5")
+        // `$C12 * C5` — absolute column, relative row.
+        sheet.write(
+            FormulaAST.multiply(.cellRef(CellRef("$C12")), .cellRef(CellRef("C5"))), to: "C22")
+
+        let graph = DependencyGraph(sheet: sheet, including: numeric)
+        let target = CellAddress(sheet: "Model", ref: "C22")
+
+        XCTAssertEqual(
+            Set(graph.precedents(of: target).map(\.cell.reference)), ["C12", "C5"],
+            "Got: \(graph.precedents(of: target).map(\.cell.reference))")
+        XCTAssertEqual(
+            graph.dependents(of: CellAddress(sheet: "Model", ref: "C12"))
+                .map(\.cell.reference),
+            ["C22"],
+            "and the cell knows what reads it")
+        XCTAssertFalse(
+            graph.outputs.contains(CellAddress(sheet: "Model", ref: "C12")),
+            "a cell something reads is not an output")
+    }
+
+    func testAFullyAbsoluteReferenceIsTheSameCell() {
+        let book = Workbook()
+        let sheet = book.addSheet(name: "Model")
+        sheet.write(0.4, to: "B3")
+        sheet.write(FormulaAST.cellRef(CellRef("$B$3")), to: "D3")
+
+        let graph = DependencyGraph(sheet: sheet, including: numeric)
+        XCTAssertEqual(
+            graph.precedents(of: CellAddress(sheet: "Model", ref: "D3"))
+                .map(\.cell.reference),
+            ["B3"])
+    }
+
+    /// The unfiltered graph must not mint a phantom node for the marked form either.
+    func testTheUnfilteredGraphDoesNotSplitOnMarkers() {
+        let book = Workbook()
+        let sheet = book.addSheet(name: "Model")
+        sheet.write(0.4, to: "B3")
+        sheet.write(FormulaAST.cellRef(CellRef("$B$3")), to: "D3")
+
+        let graph = DependencyGraph(sheet: sheet)
+        XCTAssertEqual(
+            graph.allCells.count, 2,
+            "B3 and D3 — not three. Got: \(graph.allCells.map(\.cell.reference).sorted())")
+    }
+
     // MARK: - The existing initializer is untouched
 
     func testTheWorkbookInitializerIsUnchanged() {

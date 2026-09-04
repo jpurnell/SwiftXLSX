@@ -252,6 +252,24 @@ public struct DependencyGraph: Sendable {
     ///   - ast: The formula AST to walk.
     ///   - inSheet: The name of the sheet containing the formula (for unqualified refs).
     /// - Returns: All cell addresses referenced by the formula.
+    /// A reference with its `$` markers dropped.
+    ///
+    /// A marker says how a formula *fills* when copied, not which cell it means:
+    /// `$C12`, `C$12` and `C12` are one cell. ``CellRef`` hashes the markers, so
+    /// carrying them into the graph splits a cell into as many nodes as the forms
+    /// used to reach it — a phantom `$B$3` beside the real `B3`, with the edges
+    /// divided between them.
+    ///
+    /// That is not a small error on real models. A mixed reference is how a rule
+    /// fills across a row while holding one operand still, so the edges lost are
+    /// exactly the ones tying every period back to its assumptions.
+    ///
+    /// - Parameter reference: The reference as written.
+    /// - Returns: The same cell, unmarked.
+    private static func unmarked(_ reference: CellRef) -> CellRef {
+        CellRef(column: reference.column, row: reference.row)
+    }
+
     private static func extractReferences(
         from ast: FormulaAST,
         inSheet: String
@@ -259,14 +277,14 @@ public struct DependencyGraph: Sendable {
         // Guard: base cases return immediately, recursive cases reduce AST depth
         switch ast {
         case .cellRef(let ref):
-            return [CellAddress(sheet: inSheet, cell: ref)]
+            return [CellAddress(sheet: inSheet, cell: unmarked(ref))]
 
         case .cellRange(let range):
-            return range.cells.map { CellAddress(sheet: inSheet, cell: $0) }
+            return range.cells.map { CellAddress(sheet: inSheet, cell: unmarked($0)) }
 
         case .sheetRef(let sheetRef):
             return sheetRef.range.cells.map {
-                CellAddress(sheet: sheetRef.sheetName, cell: $0)
+                CellAddress(sheet: sheetRef.sheetName, cell: unmarked($0))
             }
 
         case .namedRange:

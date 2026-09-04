@@ -30,8 +30,19 @@ given before the graph is built.
   so without this there was no way to enumerate membership at all — which is the first thing a
   caller asks of a scoped graph.
 
-`DependencyGraph(workbook:)` is unchanged, and a test pins that: labels still counted, every sheet
-still walked, referenced empty cells still nodes.
+### Fixed
+- A `$` marker split a cell into several graph nodes. `CellRef` hashes its markers, so a formula
+  reading `$C12` produced a phantom node beside the real `C12`, with the edges divided between
+  them — and under a filter the marked form fell out of scope, so the edge was dropped entirely
+  and the cell looked as though nothing read it.
+
+  That is not a small error on real models: a mixed reference is how a rule fills across a row
+  while holding one operand still, so the edges lost are exactly the ones tying every period back
+  to its assumptions. Found on a teaching model whose four decision variables all appeared to be
+  unread, because every formula reached them as `$C12`.
+
+`DependencyGraph(workbook:)` is otherwise unchanged, and a test pins that: labels still counted,
+every sheet still walked, referenced empty cells still nodes.
 
 ## [0.10.0] - 2026-09-03
 
