@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-04
+
+**The spreadsheet vocabulary moved to SwiftExcelCore.** `CellValue`, `CellRef`, `CellRange`,
+`CellAddress`, `SheetReference`, `ExcelError`, `FormulaAST`, `NamedRange` and the
+`CellValueProvider` protocol now live in a separate Foundation-only package, so a function library
+and a file reader can share them without depending on each other.
+
+**Source-compatible.** This package re-exports SwiftExcelCore with `@_exported`, so
+`import SwiftXLSX` still sees every one of those types and no existing caller needs a second
+import. Verified against a downstream consumer: BusinessMathExcel's 564 tests pass with no source
+change.
+
+### Changed
+- Depends on **SwiftExcelCore 0.1.0**, pinned `exact:`.
+- `WorkbookValueProvider` split into its own file. It was sharing one with the
+  `CellValueProvider` protocol it conforms to; the protocol is the seam that lets a function
+  library read cells without a workbook, and it moved, while the conformance needs a `Workbook`
+  and stayed.
+
+### Notes
+- `EvalError` stayed. It is internal, and documented as evaluation's own error type "mapped to
+  `ExcelError` at the boundary" — the function library's business rather than the vocabulary's. It
+  will travel with the functions when those move to SwiftExcelFunctions.
+- `CellValueWriteTests` is new, holding three cases lifted from `CellValueTests`: they write
+  through a `Worksheet` and read the value back, which asserts what storage does rather than what
+  the value type is.
+- 1,268 tests passing; 170 more moved to SwiftExcelCore with the types they cover.
+
+## [0.11.1] - 2026-09-03
+
+### Fixed
+- A `$` marker is not a different cell. `DependencyGraph` treated `$B$3` and `B3` as distinct
+  nodes, so a graph over a sheet using absolute references split into disconnected pieces and
+  under-reported both dependents and precedents.
+
+Released rather than retagged: `v0.11.0` had already been consumed downstream, and moving a
+published tag breaks SwiftPM's trust-on-first-use fingerprint for every consumer that recorded it.
+
 ## [0.11.0] - 2026-09-03
 
 A dependency graph can be built over part of a workbook.
