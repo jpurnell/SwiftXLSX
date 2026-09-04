@@ -75,8 +75,11 @@ public enum FormulaLexer {
                 continue
             }
 
-            // 7. $ or letter: cell ref, boolean, or identifier
-            if ch == "$" || ch.isLetter {
+            // 7. $, letter or underscore: cell ref, boolean, or identifier.
+            // A leading underscore is how Excel marks a function it did not
+            // define itself — `_xll.` for an add-in, `_xlfn.` for one newer than
+            // the file format — and it is legal at the start of a defined name.
+            if ch == "$" || ch.isLetter || ch == "_" {
                 let token = try scanWordOrCellRef(chars: chars, pos: &pos, formula: formula)
                 tokens.append(token)
                 continue
@@ -361,7 +364,13 @@ public enum FormulaLexer {
         var raw: [Character] = []
         while pos < chars.count {
             let ch = chars[pos]
-            if ch == "$" || ch.isLetter || ch.isNumber {
+            // Underscores and dots belong inside the word. A defined name may
+            // contain both — `days_per_week`, `report.week` — and a function name
+            // may too: `COVARIANCE.P` is one name, not `COVARIANCE` followed by
+            // something, and `_xlfn.COVARIANCE.P` is that with a marker on front.
+            // A number cannot reach here, because this scanner is only entered on
+            // `$`, a letter or an underscore, so a dot is never a decimal point.
+            if ch == "$" || ch.isLetter || ch.isNumber || ch == "_" || ch == "." {
                 raw.append(ch)
                 pos += 1
             } else {
