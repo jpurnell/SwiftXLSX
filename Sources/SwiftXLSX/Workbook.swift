@@ -1,5 +1,6 @@
 import Foundation
 import SwiftZIP
+import SwiftExcelCore
 
 /// An Excel workbook containing one or more worksheets.
 // Justification: Workbook is only mutated during construction, before save

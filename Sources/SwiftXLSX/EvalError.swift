@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Internal errors raised during function evaluation, mapped to ``ExcelError`` at the boundary.
 enum EvalError: Error {
     /// The argument cannot be converted to the required type.

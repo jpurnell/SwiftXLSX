@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Parses an OOXML worksheet (`xl/worksheets/sheetN.xml`) into a ``Worksheet``.
 ///

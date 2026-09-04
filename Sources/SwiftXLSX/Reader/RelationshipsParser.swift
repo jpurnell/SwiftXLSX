@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 struct Relationship: Sendable {
     let id: String

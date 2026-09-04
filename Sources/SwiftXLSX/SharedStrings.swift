@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Manages the shared string table for an XLSX workbook.
 // Justification: SharedStrings is only mutated during workbook construction, before save
 public final class SharedStrings: @unchecked Sendable {

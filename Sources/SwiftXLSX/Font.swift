@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// An Excel cell font specification.
 public struct Font: Equatable, Hashable, Sendable {
     /// The font family name, e.g. "Calibri" or "SF Mono".

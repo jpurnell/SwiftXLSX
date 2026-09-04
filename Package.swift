@@ -12,12 +12,14 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
         .package(url: "https://github.com/jpurnell/SwiftZIP.git", from: "0.6.0"),
+        .package(path: "../SwiftExcelCore"),
     ],
     targets: [
         .target(
             name: "SwiftXLSX",
             dependencies: [
                 .product(name: "SwiftZIP", package: "SwiftZIP"),
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
             ],
             path: "Sources/SwiftXLSX",
             resources: [.process("SwiftXLSX.docc")]

@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Tokenizes an Excel formula string into a sequence of ``FormulaToken`` values.
 ///
 /// The lexer handles all standard Excel formula constructs including cell references

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Errors that can occur when reading an .xlsx file.
 public enum XLSXReadError: Error, Sendable {

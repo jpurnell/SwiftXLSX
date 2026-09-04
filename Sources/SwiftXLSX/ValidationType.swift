@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// The type of data validation to apply to a cell range.
 public enum ValidationType: Sendable {
     /// Restricts input to a dropdown list of values.

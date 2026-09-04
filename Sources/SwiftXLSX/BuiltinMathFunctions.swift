@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Math category built-in Excel functions.
 ///

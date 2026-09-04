@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Derives a shared formula's text for the cells that do not carry it.
 ///

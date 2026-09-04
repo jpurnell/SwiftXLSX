@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// A cell formatting style composed of font, border, alignment, number format, and fill.
 public struct CellStyle: Equatable, Hashable, Sendable {
     /// The font specification for this style.

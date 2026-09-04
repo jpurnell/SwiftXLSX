@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// A copy-on-write registry mapping Excel function names to Swift implementations.
 ///
 /// ``FunctionRegistry`` stores ``ExcelFunction`` definitions indexed by their

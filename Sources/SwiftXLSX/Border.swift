@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// An Excel cell border specification with four independent edges.
 public struct Border: Equatable, Hashable, Sendable {
     /// The top edge border.

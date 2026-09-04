@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Turns a `definedName` element into a ``NamedRange``.
 ///

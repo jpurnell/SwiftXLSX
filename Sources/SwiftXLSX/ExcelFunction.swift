@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// A registered Excel function with name, arity constraints, and evaluation logic.
 ///

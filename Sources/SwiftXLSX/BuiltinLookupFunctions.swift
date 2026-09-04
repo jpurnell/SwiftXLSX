@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Lookup category built-in Excel functions.
 ///

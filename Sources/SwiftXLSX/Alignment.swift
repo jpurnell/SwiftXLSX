@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// An Excel cell alignment specification.
 public struct Alignment: Equatable, Hashable, Sendable {
     /// The horizontal alignment within the cell.

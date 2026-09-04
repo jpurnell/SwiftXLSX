@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Financial category built-in functions matching Excel's financial function library.
 ///

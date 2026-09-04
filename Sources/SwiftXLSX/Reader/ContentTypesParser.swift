@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 struct ContentTypes: Sendable {
     var defaults: [String: String]     // extension -> content type

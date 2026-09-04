@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Convenience methods for looking up cell values by ``CellRef`` and ``CellRange``.
 extension Worksheet {
     /// Returns the value at the given cell reference, or `nil` if the cell is empty.

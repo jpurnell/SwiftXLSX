@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Evaluates a ``FormulaAST`` to a concrete ``CellValue``.
 ///

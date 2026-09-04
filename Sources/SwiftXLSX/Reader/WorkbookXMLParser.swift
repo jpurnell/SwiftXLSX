@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Information about a single sheet extracted from `xl/workbook.xml`.
 struct SheetInfo: Sendable {

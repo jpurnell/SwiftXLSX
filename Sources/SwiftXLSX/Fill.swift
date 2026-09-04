@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// An Excel cell fill (background) specification.
 public struct Fill: Equatable, Hashable, Sendable {
     /// The fill pattern type.

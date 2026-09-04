@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Parses Excel formula token arrays into ``FormulaAST`` trees using Pratt
 /// (precedence-climbing) parsing.
 ///

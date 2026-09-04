@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Manages cell styles for an XLSX workbook.
 // Justification: StyleSheet is only mutated during workbook construction, before save
 public final class StyleSheet: @unchecked Sendable {

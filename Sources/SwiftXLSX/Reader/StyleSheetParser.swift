@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Intermediate representation of a parsed `xl/styles.xml` stylesheet.
 ///

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// A single worksheet within a workbook.
 // Justification: Worksheet is only mutated during construction, before save

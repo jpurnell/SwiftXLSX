@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Aggregation category built-in Excel functions.
 ///

@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// An Excel number format specification.
 public struct NumberFormat: Equatable, Hashable, Sendable {
     /// The Excel format string, e.g. "#,##0.00" or "mm/dd/yyyy".

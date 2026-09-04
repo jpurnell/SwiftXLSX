@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// A token produced by the formula lexer.
 ///
 /// Represents a single lexical unit from an Excel formula string.

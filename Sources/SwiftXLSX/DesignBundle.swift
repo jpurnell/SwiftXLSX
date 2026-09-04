@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Configurable default styling applied to new workbooks.
 public struct DesignBundle: Equatable, Sendable {
     /// The font for body/data cells.

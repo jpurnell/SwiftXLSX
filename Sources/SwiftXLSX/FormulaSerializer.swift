@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// Converts a ``FormulaAST`` into an Excel formula string.
 public enum FormulaSerializer {
 

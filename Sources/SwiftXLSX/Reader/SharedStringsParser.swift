@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Parses the shared strings table (`xl/sharedStrings.xml`) from an XLSX archive.
 ///

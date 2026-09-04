@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// A directed acyclic graph of cell dependencies built from formula ASTs.
 ///
 /// Use `DependencyGraph` to determine the correct evaluation order for cells

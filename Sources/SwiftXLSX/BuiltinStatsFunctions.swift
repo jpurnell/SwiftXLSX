@@ -1,4 +1,5 @@
 import Foundation
+import SwiftExcelCore
 
 /// Statistics category built-in Excel functions.
 ///

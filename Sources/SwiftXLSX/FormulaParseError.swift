@@ -1,3 +1,4 @@
+import SwiftExcelCore
 /// An error encountered while parsing an Excel formula string.
 ///
 /// Contains the error kind, the character offset where the error occurred,

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftZIP
+import SwiftExcelCore
 
 /// Orchestrates reading an `.xlsx` file by delegating to individual OOXML parsers.
 ///
