@@ -27,7 +27,13 @@ public struct DependencyGraph: Sendable {
     private let dependentMap: [CellAddress: [CellAddress]]
 
     /// All cells known to the graph, in no particular order.
-    private let allCells: Set<CellAddress>
+    /// Every cell in the graph.
+    ///
+    /// Worth having separately from ``evaluationOrder``, which is empty when the
+    /// graph has a cycle — so with a cycle present there would otherwise be no way
+    /// to enumerate membership at all. That matters most for a scoped graph, where
+    /// knowing what the scope kept is the first thing a caller asks.
+    public let allCells: Set<CellAddress>
 
     /// Cells in topological order, computed during init. Empty if cycles exist.
     private let sortedCells: [CellAddress]
@@ -45,39 +51,102 @@ public struct DependencyGraph: Sendable {
     ///
     /// - Parameter workbook: The workbook whose formulas define the dependency graph.
     public init(workbook: Workbook) {
+        self.init(sheets: workbook.sheets, sheetScope: nil, including: nil)
+    }
+
+    /// Builds the dependency graph over one sheet, optionally over part of it.
+    ///
+    /// ``init(workbook:)`` answers the question a spreadsheet *evaluator* asks: in
+    /// what order must every cell be visited? For that, every cell belongs —
+    /// labels included, and a referenced-but-empty cell too, because you still
+    /// have to visit it to learn it is zero.
+    ///
+    /// A caller recovering a *model* from a sheet is asking something else: which
+    /// quantities depend on which. There a title is not a node, and a reference to
+    /// an empty cell is not an input. Filtering the whole-workbook graph
+    /// afterwards does not answer it — by then the topological order and the cycle
+    /// set have already been computed over the unfiltered set.
+    ///
+    /// So the scope is given before the graph is built. A reference to a cell the
+    /// scope excludes — on another sheet, or failing the filter — is **dropped
+    /// along with its edge**, rather than pulling a foreign or empty cell in.
+    ///
+    /// - Parameters:
+    ///   - sheet: The sheet to build over.
+    ///   - including: Whether a cell belongs in the graph, given its value.
+    ///     Defaults to every cell the sheet holds.
+    public init(sheet: Worksheet, including: ((CellValue) -> Bool)? = nil) {
+        self.init(sheets: [sheet], sheetScope: [sheet.name], including: including)
+    }
+
+    /// Builds the dependency graph over a workbook, keeping only some cells.
+    ///
+    /// - Parameters:
+    ///   - workbook: The workbook to build over.
+    ///   - including: Whether a cell belongs in the graph, given its value.
+    public init(workbook: Workbook, including: @escaping (CellValue) -> Bool) {
+        self.init(sheets: workbook.sheets, sheetScope: nil, including: including)
+    }
+
+    /// The one builder. Everything above narrows what it is given.
+    ///
+    /// - Parameters:
+    ///   - sheets: The sheets to walk.
+    ///   - sheetScope: The sheet names a reference may point at, or `nil` to allow
+    ///     any. `nil` for the whole-workbook initializers, which must keep
+    ///     registering referenced addresses exactly as they always have.
+    ///   - including: The filter, or `nil` to keep every cell — which also keeps
+    ///     referenced cells that hold nothing, preserving ``init(workbook:)``.
+    private init(
+        sheets: [Worksheet],
+        sheetScope: Set<String>?,
+        including: ((CellValue) -> Bool)?
+    ) {
         var precedents: [CellAddress: [CellAddress]] = [:]
         var dependents: [CellAddress: [CellAddress]] = [:]
         var cells: Set<CellAddress> = []
 
-        // Walk all cells in all sheets
-        for sheet in workbook.sheets {
+        // Which addresses are in scope at all. Built first, because an edge can
+        // only be kept once both ends are known to belong.
+        var inScope: Set<CellAddress> = []
+        for sheet in sheets {
+            for (refString, (value, _)) in sheet.cells {
+                guard including?(value) ?? true else { continue }
+                inScope.insert(CellAddress(sheet: sheet.name, ref: refString))
+            }
+        }
+
+        for sheet in sheets {
             for (refString, (value, _)) in sheet.cells {
                 let cellAddr = CellAddress(sheet: sheet.name, ref: refString)
+                guard inScope.contains(cellAddr) else { continue }
                 cells.insert(cellAddr)
 
-                // If this cell has a formula, extract its references
-                if case .formula(let ast, _) = value {
-                    let refs = DependencyGraph.extractReferences(
-                        from: ast, inSheet: sheet.name
-                    )
-                    // Deduplicate while preserving order
-                    var seen = Set<CellAddress>()
-                    var uniqueRefs: [CellAddress] = []
-                    for ref in refs {
-                        if seen.insert(ref).inserted {
-                            uniqueRefs.append(ref)
-                        }
-                    }
+                guard case .formula(let ast, _) = value else { continue }
+                let refs = DependencyGraph.extractReferences(from: ast, inSheet: sheet.name)
 
-                    precedents[cellAddr] = uniqueRefs
+                // Deduplicate while preserving order.
+                var seen = Set<CellAddress>()
+                var uniqueRefs: [CellAddress] = []
+                for ref in refs where seen.insert(ref).inserted {
+                    // A reference off the scoped sheets is out of scope whether or
+                    // not a content filter was given: the caller asked for a graph
+                    // over this sheet, and another sheet's cell is not on it.
+                    if let sheetScope, !sheetScope.contains(ref.sheet) { continue }
 
-                    // Register all referenced cells in the graph
-                    for ref in uniqueRefs {
-                        cells.insert(ref)
-                        var deps = dependents[ref, default: []]
-                        deps.append(cellAddr)
-                        dependents[ref] = deps
-                    }
+                    // With a filter, a reference to an excluded cell is dropped with
+                    // its edge. Without one, every referenced address becomes a node
+                    // — including cells holding nothing — which is what an evaluator
+                    // needs and what ``init(workbook:)`` has always done.
+                    if including != nil && !inScope.contains(ref) { continue }
+
+                    uniqueRefs.append(ref)
+                }
+
+                precedents[cellAddr] = uniqueRefs
+                for ref in uniqueRefs {
+                    cells.insert(ref)
+                    dependents[ref, default: []].append(cellAddr)
                 }
             }
         }
@@ -86,7 +155,6 @@ public struct DependencyGraph: Sendable {
         self.dependentMap = dependents
         self.allCells = cells
 
-        // Topological sort using Kahn's algorithm
         let (sorted, cycles) = DependencyGraph.topologicalSort(
             cells: cells,
             precedents: precedents,

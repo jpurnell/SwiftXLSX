@@ -224,7 +224,8 @@ its defined scope. Future work is driven by consumer needs:
 
 ---
 
-*Last updated: 2026-09-03 -- recorded 0.10.0 (`write(_:to:cached:style:)`), after 0.8.0
-(named ranges) and 0.9.0 (cell styles). All three were the same shape: information the reader
-understood, with no way for a caller to reach or state it. This one is the writer's half —
-a workbook built in code could not be made to look like one read from disk.*
+*Last updated: 2026-09-03 -- recorded 0.10.0 (`write(_:to:cached:style:)`) and 0.11.0 (a
+dependency graph scoped to a sheet or a subset of cells, and `allCells` made public). The
+0.8.0 through 0.10.0 releases were all one shape: information the reader understood, with no
+way for a caller to reach or state it. 0.11.0 is a different one — the graph was reachable, but
+only ever answered the evaluator's question, and a caller recovering a model is asking another.*

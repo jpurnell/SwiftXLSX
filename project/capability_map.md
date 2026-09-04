@@ -70,6 +70,12 @@ table's body being cached numbers under a single marker.
 **Interfaces:** `DependencyGraph.topologicalSort()`, cycle detection, impact analysis
 **Applications:** Determining recalculation order, finding circular references, assessing the blast radius of changing a cell
 
+Scoped as of 0.11.0. The whole-workbook graph is a *calculation-order* graph — every cell, labels
+and referenced-empty cells included, which is what an evaluator needs. A caller recovering a model
+wants a different graph over the same file: one sheet, numeric cells, references out of scope
+dropped with their edges. Both are correct; they answer different questions, so the scope is given
+before the graph is built rather than filtered afterwards.
+
 ## Presentation and Layout
 
 **Key types:** `CellStyle`, `Font`, `Border`, `Alignment`, `Fill`, `NumberFormat`, `StyleSheet`, `DesignBundle`, `ValidationType`

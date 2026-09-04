@@ -7,6 +7,32 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-03
+
+A dependency graph can be built over part of a workbook.
+
+`DependencyGraph(workbook:)` answers the question a spreadsheet *evaluator* asks: in what order
+must every cell be visited? For that, every cell belongs — labels included, and a
+referenced-but-empty cell too, because you still have to visit it to learn it is zero.
+
+A caller recovering a *model* from a sheet is asking something else: which quantities depend on
+which. There a title in `A1` is not a node, and a reference to an empty cell is not an input.
+Filtering the whole-workbook graph afterwards does not answer it, because by then the topological
+order and the cycle set have already been computed over the unfiltered set. The scope has to be
+given before the graph is built.
+
+### Added
+- `DependencyGraph(sheet:including:)` and `DependencyGraph(workbook:including:)`. A reference to a
+  cell the scope excludes — on another sheet, or failing the filter — is dropped along with its
+  edge, rather than pulling a foreign or empty cell in. Sheet scoping applies whether or not a
+  content filter is given.
+- `DependencyGraph.allCells` is now public. `evaluationOrder` is empty when the graph has a cycle,
+  so without this there was no way to enumerate membership at all — which is the first thing a
+  caller asks of a scoped graph.
+
+`DependencyGraph(workbook:)` is unchanged, and a test pins that: labels still counted, every sheet
+still walked, referenced empty cells still nodes.
+
 ## [0.10.0] - 2026-09-03
 
 A formula can be written with the value it last computed. The reader has always surfaced both —
