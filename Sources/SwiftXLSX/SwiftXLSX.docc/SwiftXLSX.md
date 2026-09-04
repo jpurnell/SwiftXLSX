@@ -22,11 +22,12 @@ let outputURL = URL(fileURLWithPath: "Interest.xlsx")
 try workbook.save(to: outputURL)
 ```
 
-Formula evaluation runs through ``FormulaEvaluator``, which resolves cell
-references via a ``CellValueProvider`` and named ranges via a
-``NameResolver``. Function lookup goes through a ``FunctionRegistry``,
-which starts from the built-in catalogue and accepts your own
-``ExcelFunction`` values.
+This package reads and writes; it does not evaluate. Formula evaluation, the
+built-in Excel functions and the function registry live in
+[SwiftExcelFunctions](https://github.com/jpurnell/SwiftExcelFunctions), which
+takes a `FormulaAST` from here and a `CellValueProvider` — `WorkbookValueProvider`
+conforms — and computes a result. A caller that only reads and writes files needs
+none of it.
 
 ## Topics
 
@@ -60,26 +61,10 @@ which starts from the built-in catalogue and accepts your own
 - ``FormulaToken``
 - ``FormulaParseError``
 
-### Evaluation
+### Reading cells and dependencies
 
-- ``FormulaEvaluator``
-- ``CellValueProvider``
 - ``WorkbookValueProvider``
 - ``DependencyGraph``
-
-### Functions
-
-- ``ExcelFunction``
-- ``FunctionRegistry``
-- ``ExcelFunctionError``
-- ``BuiltinMathFunctions``
-- ``BuiltinStatsFunctions``
-- ``BuiltinFinancialFunctions``
-- ``BuiltinLogicalFunctions``
-- ``BuiltinTextFunctions``
-- ``BuiltinLookupFunctions``
-- ``BuiltinDateFunctions``
-- ``BuiltinAggregationFunctions``
 
 ### Named Ranges
 
