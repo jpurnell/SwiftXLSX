@@ -53,15 +53,10 @@ final class FormulaParserGapTests: XCTestCase {
     /// `$E:$E` is every cell in column E. A criteria function over a column is
     /// how a spreadsheet says "look at all of it".
     func testWholeColumnRange() {
-        XCTExpectFailure("Whole-column ranges are the largest remaining gap at ~135,000 formulas, "
-            + "and cannot ship alone: `DependencyGraph` enumerates `range.cells`, so `$B:$G` "
-            + "would expand to 6.3 million addresses per occurrence. The parser fix needs a "
-            + "bound in the graph beside it.")
         XCTAssertTrue(parses("SUMIFS(Sheet2!$E:$E,Sheet2!$C:$C,$A$2)"))
     }
 
     func testWholeRowRangeOnAQuotedSheet() {
-        XCTExpectFailure("Same gap, along a row.")
         XCTAssertTrue(parses("HLOOKUP(DW$2,'Lease Revenue'!$2:$3,2)+5"))
     }
 

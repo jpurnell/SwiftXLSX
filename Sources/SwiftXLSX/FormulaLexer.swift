@@ -395,6 +395,13 @@ public enum FormulaLexer {
             return .cellRef(cellRef)
         }
 
+        // `$E` and `$2` are not failed cell references. They are how a formula
+        // names a whole column or a whole row — `SUMIFS(Sheet2!$E:$E, ...)` — and
+        // the corpus writes them about 135,000 times.
+        if hasDollar, let partial = parsePartialReference(raw: raw) {
+            return partial
+        }
+
         // If $ was present, it must be a cell ref attempt that failed
         if hasDollar {
             throw FormulaParseError(
@@ -405,6 +412,35 @@ public enum FormulaLexer {
         }
 
         return .identifier(word)
+    }
+
+    /// Parses `$E` as a column and `$2` as a row.
+    ///
+    /// Excel's limits decide validity: 16,384 columns and 1,048,576 rows. A word
+    /// mixing letters and digits is a cell reference and is not handled here.
+    ///
+    /// - Parameter raw: The raw characters, `$` markers included.
+    /// - Returns: `.columnRef`, `.rowRef`, or `nil` if it is neither.
+    private static func parsePartialReference(raw: [Character]) -> FormulaToken? {
+        let bare = raw.filter { $0 != "$" }
+        guard !bare.isEmpty else { return nil }
+
+        if bare.allSatisfy(\.isLetter) {
+            var column = 0
+            for ch in bare {
+                guard let value = ch.uppercased().unicodeScalars.first?.value else { return nil }
+                column = column * 26 + Int(value - 64)
+            }
+            guard column >= 1 && column <= 16_384 else { return nil }
+            return .columnRef(column)
+        }
+
+        if bare.allSatisfy(\.isNumber) {
+            guard let row = Int(String(bare)), row >= 1 && row <= 1_048_576 else { return nil }
+            return .rowRef(row)
+        }
+
+        return nil
     }
 
     // MARK: - Cell reference parsing

@@ -151,6 +151,8 @@ private struct TokenParser {
         case .cellRef(let r): return "cell(\(r.reference))"
         case .quotedName(let n): return "'\(n)'"
         case .identifier(let n): return "identifier(\(n))"
+        case .columnRef(let c): return "column(\(c))"
+        case .rowRef(let r): return "row(\(r))"
         case .plus: return "+"
         case .minus: return "-"
         case .asterisk: return "*"
@@ -238,6 +240,18 @@ private struct TokenParser {
             advance()
             return try parseCellRefOrRange(ref)
 
+        case .columnRef, .rowRef:
+            let start = currentToken
+            advance()
+            guard currentToken == .colon else {
+                throw FormulaParseError(
+                    kind: .unexpectedToken(expected: ":", found: describeToken(currentToken)),
+                    offset: position,
+                    formula: formula
+                )
+            }
+            return try parsePartialRange(start)
+
         case .identifier(let name):
             advance()
             return try parseIdentifier(name)
@@ -277,6 +291,30 @@ private struct TokenParser {
     // MARK: - Cell Reference / Range
 
     /// After consuming a `.cellRef`, checks for `:` to parse a range.
+    /// A range whose ends name only columns, or only rows.
+    ///
+    /// Called with the opening token already consumed and `.colon` current.
+    private mutating func parsePartialRange(_ start: FormulaToken) throws -> FormulaAST {
+        advance()
+        switch (start, currentToken) {
+        case (.columnRef(let first), .columnRef(let last)):
+            advance()
+            return .cellRange(TokenParser.columnSpan(from: first, to: last))
+        case (.rowRef(let first), .rowRef(let last)):
+            advance()
+            return .cellRange(TokenParser.rowSpan(from: first, to: last))
+        default:
+            throw FormulaParseError(
+                kind: .unexpectedToken(
+                    expected: "a matching column or row reference",
+                    found: describeToken(currentToken)
+                ),
+                offset: position,
+                formula: formula
+            )
+        }
+    }
+
     private mutating func parseCellRefOrRange(_ startRef: CellRef) throws -> FormulaAST {
         if currentToken == .colon {
             advance()
@@ -294,6 +332,30 @@ private struct TokenParser {
             return .cellRange(CellRange(from: startRef, to: endRef))
         }
         return .cellRef(startRef)
+    }
+
+
+    /// Excel's grid: 16,384 columns by 1,048,576 rows.
+    ///
+    /// A whole-column reference is a range over every row of that column, and a
+    /// whole-row reference is a range over every column of that row. Expressing
+    /// them this way needs no new `FormulaAST` case — they are ranges, and saying
+    /// so keeps every consumer working unchanged.
+    static let lastColumn = 16_384
+    static let lastRow = 1_048_576
+
+    /// The range `$E:$G` names.
+    static func columnSpan(from first: Int, to last: Int) -> CellRange {
+        CellRange(
+            from: CellRef(column: min(first, last), row: 1),
+            to: CellRef(column: max(first, last), row: lastRow))
+    }
+
+    /// The range `$2:$3` names.
+    static func rowSpan(from first: Int, to last: Int) -> CellRange {
+        CellRange(
+            from: CellRef(column: 1, row: min(first, last)),
+            to: CellRef(column: lastColumn, row: max(first, last)))
     }
 
     // MARK: - Identifier Dispatch
@@ -348,6 +410,32 @@ private struct TokenParser {
     /// Called after consuming `.identifier(name)` or `.quotedName(name)`.
     private mutating func parseSheetReference(_ name: String) throws -> FormulaAST {
         try expect(.exclamation)
+
+        // A sheet-qualified whole column or row: `Sheet2!$E:$E`.
+        if case .columnRef = currentToken {
+            let start = currentToken
+            advance()
+            guard currentToken == .colon, case .cellRange(let range) = try parsePartialRange(start)
+            else {
+                throw FormulaParseError(
+                    kind: .unexpectedToken(expected: ":", found: describeToken(currentToken)),
+                    offset: position, formula: formula
+                )
+            }
+            return .sheetRef(SheetReference(sheet: name, range: range))
+        }
+        if case .rowRef = currentToken {
+            let start = currentToken
+            advance()
+            guard currentToken == .colon, case .cellRange(let range) = try parsePartialRange(start)
+            else {
+                throw FormulaParseError(
+                    kind: .unexpectedToken(expected: ":", found: describeToken(currentToken)),
+                    offset: position, formula: formula
+                )
+            }
+            return .sheetRef(SheetReference(sheet: name, range: range))
+        }
 
         guard case .cellRef(let startRef) = currentToken else {
             throw FormulaParseError(

@@ -124,7 +124,8 @@ public struct DependencyGraph: Sendable {
                 cells.insert(cellAddr)
 
                 guard case .formula(let ast, _) = value else { continue }
-                let refs = DependencyGraph.extractReferences(from: ast, inSheet: sheet.name)
+                let refs = DependencyGraph.extractReferences(
+                    from: ast, inSheet: sheet.name, populated: inScope)
 
                 // Deduplicate while preserving order.
                 var seen = Set<CellAddress>()
@@ -271,9 +272,52 @@ public struct DependencyGraph: Sendable {
         CellRef(column: reference.column, row: reference.row)
     }
 
+    /// The cells a range depends on.
+    ///
+    /// Small ranges enumerate exactly, empty cells included: `A1:A5` names five
+    /// cells whether or not anything is in them, and a referenced empty cell is
+    /// still a cell an evaluator must visit to learn it is zero.
+    ///
+    /// **A whole-column range is a different statement.** `$B:$G` is not a request
+    /// for 6,291,456 cells; it is a request for whatever is in those columns, and
+    /// the corpus writes it 87,773 times in `VLOOKUP` alone. Enumerating it would
+    /// produce hundreds of billions of addresses, so above ``exactEnumerationLimit``
+    /// the range is intersected with the cells that actually exist.
+    ///
+    /// The cutoff is a size at which no one is naming cells individually any more.
+    /// Below it the behaviour is exactly what it has always been.
+    private static func addresses(
+        in range: CellRange,
+        sheet: String,
+        populated: Set<CellAddress>
+    ) -> [CellAddress] {
+        let size = range.rowCount * range.columnCount
+        if size <= exactEnumerationLimit {
+            return range.cells.map { CellAddress(sheet: sheet, cell: unmarked($0)) }
+        }
+
+        let low = range.start
+        let high = range.end
+        return populated
+            .filter { address in
+                address.sheet == sheet
+                    && address.cell.column >= low.column && address.cell.column <= high.column
+                    && address.cell.row >= low.row && address.cell.row <= high.row
+            }
+            .map { CellAddress(sheet: $0.sheet, cell: unmarked($0.cell)) }
+            .sorted { ($0.cell.row, $0.cell.column) < ($1.cell.row, $1.cell.column) }
+    }
+
+    /// The largest range enumerated cell by cell, empty cells included.
+    ///
+    /// 4,096 is four columns of a thousand rows — larger than any range a person
+    /// writes out deliberately, and far smaller than a single whole column.
+    static let exactEnumerationLimit = 4_096
+
     private static func extractReferences(
         from ast: FormulaAST,
-        inSheet: String
+        inSheet: String,
+        populated: Set<CellAddress>
     ) -> [CellAddress] {
         // Guard: base cases return immediately, recursive cases reduce AST depth
         switch ast {
@@ -281,12 +325,10 @@ public struct DependencyGraph: Sendable {
             return [CellAddress(sheet: inSheet, cell: unmarked(ref))]
 
         case .cellRange(let range):
-            return range.cells.map { CellAddress(sheet: inSheet, cell: unmarked($0)) }
+            return addresses(in: range, sheet: inSheet, populated: populated)
 
         case .sheetRef(let sheetRef):
-            return sheetRef.range.cells.map {
-                CellAddress(sheet: sheetRef.sheetName, cell: unmarked($0))
-            }
+            return addresses(in: sheetRef.range, sheet: sheetRef.sheetName, populated: populated)
 
         case .namedRange:
             // Named range resolution requires a NameResolver; skip for now
@@ -307,14 +349,16 @@ public struct DependencyGraph: Sendable {
              .lessThan(let l, let r),
              .greaterOrEqual(let l, let r),
              .lessOrEqual(let l, let r):
-            return extractReferences(from: l, inSheet: inSheet)
-                 + extractReferences(from: r, inSheet: inSheet)
+            return extractReferences(from: l, inSheet: inSheet, populated: populated)
+                 + extractReferences(from: r, inSheet: inSheet, populated: populated)
 
         case .negate(let expr):
-            return extractReferences(from: expr, inSheet: inSheet)
+            return extractReferences(from: expr, inSheet: inSheet, populated: populated)
 
         case .function(_, let args):
-            return args.flatMap { extractReferences(from: $0, inSheet: inSheet) }
+            return args.flatMap {
+                extractReferences(from: $0, inSheet: inSheet, populated: populated)
+            }
         }
     }
 

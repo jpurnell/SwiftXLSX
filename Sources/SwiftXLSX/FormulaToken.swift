@@ -27,6 +27,15 @@ public enum FormulaToken: Equatable, Sendable {
     case cellRef(CellRef)
 
     /// A quoted sheet name with quotes stripped (e.g., `'My Sheet'` becomes `My Sheet`).
+    /// A reference naming a column and no row — the `$E` of `$E:$E`.
+    ///
+    /// Only ever produced with a `$`, because a bare `E` is indistinguishable
+    /// from a defined name until the parser sees what follows it.
+    case columnRef(Int)
+
+    /// A reference naming a row and no column — the `$2` of `$2:$3`.
+    case rowRef(Int)
+
     case quotedName(String)
 
     // MARK: - Identifiers
