@@ -22,7 +22,11 @@ public final class Worksheet: @unchecked Sendable {
     /// the auto-filter, because that is what it is: a statement about a rectangle.
     /// Keeping it out of the anchor's `CellValue` leaves that formula's AST exactly
     /// what the author wrote, which is what every reader downstream wants to see.
-    private(set) var arrayFormulas: [(anchor: CellRef, span: CellRange)] = []
+    ///
+    /// Public because recalculating a workbook needs it: something has to know
+    /// which formulas fill a span before it can evaluate them and write the results
+    /// back, and the sheet is the only thing that does.
+    public private(set) var arrayFormulas: [ArrayFormula] = []
     private(set) var rowHeights: [Int: Double] = [:]
     private(set) var frozenPaneRef: String?
 
@@ -74,7 +78,7 @@ public final class Worksheet: @unchecked Sendable {
     ///   - anchor: The top-left cell, which carries the formula.
     ///   - span: The rectangle the formula fills.
     func addArrayFormula(anchor: CellRef, span: CellRange) {
-        arrayFormulas.append((anchor: anchor, span: span))
+        arrayFormulas.append(ArrayFormula(anchor: anchor, span: span))
     }
 
     /// Sets the width of a column by its 1-based index.
@@ -169,7 +173,7 @@ public final class Worksheet: @unchecked Sendable {
     ) {
         let anchor = range.start
         writeFormula(formula, to: anchor.reference, style: style)
-        arrayFormulas.append((anchor: anchor, span: range))
+        arrayFormulas.append(ArrayFormula(anchor: anchor, span: range))
 
         for row in range.start.row...range.end.row {
             for column in range.start.column...range.end.column {

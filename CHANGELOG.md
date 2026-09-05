@@ -7,6 +7,21 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-05
+
+### Added
+
+- **`Worksheet.arrayFormulas` is public**, as a new `ArrayFormula` struct.
+
+  Recalculating a workbook needs it: something has to find which formulas fill a
+  span before it can evaluate them and write the results back, and the sheet is the
+  only thing that knows. It was internal, which made the loop unusable from outside
+  the package — the last thing standing between the two halves of spilling and an
+  actual round trip.
+
+  A struct rather than the tuple it was, because this is public surface now and a
+  struct can gain a field without breaking callers that destructure it.
+
 ## [0.19.0] - 2026-09-05
 
 ### Added
