@@ -184,6 +184,41 @@ public final class Worksheet: @unchecked Sendable {
         }
     }
 
+    /// Writes a set of evaluated values into their cells.
+    ///
+    /// The counterpart to `FormulaEvaluator.spill(_:over:…)` in SwiftExcelFunctions,
+    /// which evaluates one array formula and answers with exactly this: one value
+    /// per cell of the span it fills. Evaluation produces an assignment, this
+    /// applies one, and neither library depends on the other.
+    ///
+    /// A caller holding both libraries writes
+    /// `sheet.apply(try FormulaEvaluator.spill(ast, over: span, cells: cells, names: names))`
+    /// — but that formula cannot be shown as a compiling example here, because this
+    /// package does not import the evaluator and should not start.
+    ///
+    /// ```swift
+    /// let workbook = Workbook()
+    /// let sheet = workbook.addSheet(name: "Sheet1")
+    /// sheet.apply([CellRef("C1"): .number(10), CellRef("D1"): .number(20)])
+    /// ```
+    ///
+    /// A cell that already holds a formula keeps it and gains a cached value, which
+    /// is how Excel stores a calculated cell. A cell with no formula receives the
+    /// value itself.
+    ///
+    /// - Parameter assignment: The values, by cell.
+    public func apply(_ assignment: [CellRef: CellValue]) {
+        for (cell, value) in assignment {
+            let existing = cells[cell.reference]
+            let style = existing?.1 ?? .general
+            if case .formula(let ast, _)? = existing?.0 {
+                store(cell.reference, (.formula(ast, cached: value), style))
+            } else {
+                store(cell.reference, (value, style))
+            }
+        }
+    }
+
     /// Writes an evaluated result across a span.
     ///
     /// One formula fills a rectangle, and until something evaluates it those cells
@@ -214,20 +249,15 @@ public final class Worksheet: @unchecked Sendable {
     ///   - range: The span it fills.
     public func spill(_ matrix: CellMatrix, over range: CellRange) {
         let filled = matrix.spilled(toRows: range.rowCount, columns: range.columnCount)
+        var assignment: [CellRef: CellValue] = [:]
+        assignment.reserveCapacity(filled.count)
         for row in 0..<filled.rows {
             for column in 0..<filled.columns {
-                let cell = CellRef(column: range.start.column + column,
-                                   row: range.start.row + row)
-                let value = filled[row, column]
-                let existing = cells[cell.reference]
-                let style = existing?.1 ?? .general
-                if case .formula(let ast, _)? = existing?.0 {
-                    store(cell.reference, (.formula(ast, cached: value), style))
-                } else {
-                    store(cell.reference, (value, style))
-                }
+                assignment[CellRef(column: range.start.column + column,
+                                   row: range.start.row + row)] = filled[row, column]
             }
         }
+        apply(assignment)
     }
 
     /// Returns the formula AST at the given cell reference, if any.

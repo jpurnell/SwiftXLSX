@@ -570,6 +570,26 @@ final class ForeignWorkbookReadTests: XCTestCase {
         }
     }
 
+    /// `apply` is the shape an evaluator's output arrives in.
+    func testApplyWritesValuesIntoTheirCells() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.writeArrayFormula("TRANSPOSE(A1:A2)", over: CellRange(from: "C1", to: "D1"))
+        sheet.apply([CellRef("C1"): .number(1), CellRef("D1"): .number(2)])
+
+        guard case .formula(_, let cached)? = sheet.cell(at: "C1") else {
+            return XCTFail("C1 stopped being a formula")
+        }
+        XCTAssertEqual(cached, .number(1))
+    }
+
+    func testApplyOntoEmptyCellsWritesValues() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.apply([CellRef("C1"): .text("hello")])
+        XCTAssertEqual(sheet.cell(at: "C1"), .text("hello"))
+    }
+
     // MARK: - Data Tables
 
     // A What-If data table is written as a single self-closing formula element

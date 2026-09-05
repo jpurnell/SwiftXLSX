@@ -7,6 +7,21 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-05
+
+### Added
+
+- **`Worksheet.apply(_:)`** — writes a set of evaluated values into their cells.
+
+  The shape an evaluator's output actually arrives in: `FormulaEvaluator.spill` in
+  SwiftExcelFunctions answers with one value per cell, and this applies it. Without
+  it the two halves did not meet — one produced a dictionary, the other consumed a
+  matrix, and every caller had to convert between them. Found by writing the
+  integration test rather than by review.
+
+  `spill(_:over:)` is now expressed through `apply`, so one rule governs how a
+  written value meets a cell that already holds a formula.
+
 ## [0.18.0] - 2026-09-05
 
 ### Added
