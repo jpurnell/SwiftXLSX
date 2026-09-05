@@ -590,6 +590,33 @@ final class ForeignWorkbookReadTests: XCTestCase {
         XCTAssertEqual(sheet.cell(at: "C1"), .text("hello"))
     }
 
+    /// A formula whose result is an error keeps that result through a save.
+    ///
+    /// It did not: only numbers and text were written back, so `#N/A` returned as a
+    /// formula with no value at all — and a mis-sized array formula lost the only
+    /// evidence that it was mis-sized.
+    func testACachedErrorSurvivesARoundTrip() throws {
+        let sheet = try roundTripped { sheet in
+            sheet.setCell("A1", value: .formula(.function("NA", []), cached: .error(.na)),
+                          style: .general)
+        }
+        guard case .formula(_, let cached)? = sheet.cell(at: "A1") else {
+            return XCTFail("A1 came back as \(String(describing: sheet.cell(at: "A1")))")
+        }
+        XCTAssertEqual(cached, .error(.na))
+    }
+
+    func testACachedBooleanSurvivesARoundTrip() throws {
+        let sheet = try roundTripped { sheet in
+            sheet.setCell("A1", value: .formula(.function("TRUE", []), cached: .bool(true)),
+                          style: .general)
+        }
+        guard case .formula(_, let cached)? = sheet.cell(at: "A1") else {
+            return XCTFail("A1 came back as \(String(describing: sheet.cell(at: "A1")))")
+        }
+        XCTAssertEqual(cached, .bool(true))
+    }
+
     // MARK: - Data Tables
 
     // A What-If data table is written as a single self-closing formula element

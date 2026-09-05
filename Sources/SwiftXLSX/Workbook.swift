@@ -221,8 +221,9 @@ public final class Workbook: @unchecked Sendable {
                     // function Excel knows, so serializing it would fill the span
                     // with `#NAME?`.
                     if case .function("_ARRAY", _) = ast {
-                        xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><f/>"
-                        xml += cachedValueXML(cached)
+                        let member = cachedValueXML(cached)
+                        xml += "<c r=\"\(ref)\"\(member.type) s=\"\(styleId)\"><f/>"
+                        xml += member.value
                         xml += "</c>"
                         continue
                     }
@@ -238,20 +239,10 @@ public final class Workbook: @unchecked Sendable {
                     let arrayAttributes = sheet.arrayFormulas
                         .first { $0.anchor.reference == CellRef(ref).reference }
                         .map { " t=\"array\" ref=\"\($0.span.reference)\"" } ?? ""
-                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\">"
+                    let recorded = cachedValueXML(cached)
+                    xml += "<c r=\"\(ref)\"\(recorded.type) s=\"\(styleId)\">"
                     xml += "<f\(arrayAttributes)>\(escapeXML(formulaBody))</f>"
-                    if let cached = cached {
-                        switch cached {
-                        case .number(let n):
-                            let formatted = n.truncatingRemainder(dividingBy: 1) == 0
-                                ? String(Int(n)) : String(n)
-                            xml += "<v>\(formatted)</v>"
-                        case .text(let s):
-                            xml += "<v>\(escapeXML(s))</v>"
-                        default:
-                            break
-                        }
-                    }
+                    xml += recorded.value
                     xml += "</c>"
                 case .error(let e):
                     xml += "<c r=\"\(ref)\" t=\"e\" s=\"\(styleId)\"><v>\(escapeXML(e.rawValue))</v></c>"
@@ -300,17 +291,28 @@ public final class Workbook: @unchecked Sendable {
     ///
     /// - Parameter cached: The cached value, if the cell has one.
     /// - Returns: The XML fragment, or an empty string.
-    private func cachedValueXML(_ cached: CellValue?) -> String {
-        guard let cached else { return "" }
+    private func cachedValueXML(_ cached: CellValue?) -> (type: String, value: String) {
+        guard let cached else { return ("", "") }
         switch cached {
         case .number(let number):
             let formatted = number.truncatingRemainder(dividingBy: 1) == 0
                 ? String(Int(number)) : String(number)
-            return "<v>\(formatted)</v>"
+            return ("", "<v>\(formatted)</v>")
         case .text(let text):
-            return "<v>\(escapeXML(text))</v>"
-        default:
-            return ""
+            return (" t=\"str\"", "<v>\(escapeXML(text))</v>")
+        case .bool(let flag):
+            return (" t=\"b\"", "<v>\(flag ? 1 : 0)</v>")
+        case .error(let excelError):
+            // A formula that evaluated to an error still has a value, and the cell
+            // has to say which kind. Dropping it left `#N/A` reading back as a
+            // formula with no result — which is how a mis-sized array formula lost
+            // the only evidence that it was mis-sized.
+            return (" t=\"e\"", "<v>\(escapeXML(excelError.rawValue))</v>")
+        case .blank, .date, .formula, .array:
+            // Blank is the absence of a cached value; a date is already a number by
+            // the time Excel records one; a nested formula or array is not
+            // something Excel stores as a cached result at all.
+            return ("", "")
         }
     }
 

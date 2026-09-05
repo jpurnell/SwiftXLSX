@@ -417,12 +417,27 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
     }
 
     /// Parses the cached value from a formula cell's `<v>` element.
+    ///
+    /// The cell's `t` attribute says what kind of value it is, and it has to be
+    /// consulted: `#N/A` is not the text "#N/A" and a cached `TRUE` is not the
+    /// number 1. Without it a formula that evaluated to an error came back as a
+    /// string that merely looks like one, which nothing downstream would treat as
+    /// an error.
     private func parseCachedValue() -> CellValue? {
         guard !currentValue.isEmpty else { return nil }
-        if let number = Double(currentValue) {
-            return .number(number)
+        switch currentCellType {
+        case "e":
+            return .error(ExcelError(rawValue: currentValue) ?? .value)
+        case "b":
+            return .bool(currentValue != "0")
+        case "str", "s":
+            return .text(currentValue)
+        default:
+            if let number = Double(currentValue) {
+                return .number(number)
+            }
+            return .text(currentValue)
         }
-        return .text(currentValue)
     }
 
     // MARK: - Validation Commit

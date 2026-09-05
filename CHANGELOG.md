@@ -7,6 +7,26 @@
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-05
+
+### Fixed
+
+- **A formula's cached error, boolean or date no longer vanishes on save.**
+
+  Only numbers and text were written back, so a formula that evaluated to `#N/A`
+  returned as a formula with no result at all. The reader had the matching hole: it
+  ignored the cell's `t` attribute, so even a correctly written `#N/A` came back as
+  the *text* "#N/A", and `TRUE` as the number 1 — values that merely look right and
+  that nothing downstream would treat as an error or a boolean.
+
+  Both halves are fixed. Cached errors write with `t="e"`, booleans with `t="b"`,
+  text with `t="str"`, and the reader consults the attribute.
+
+  Found by an integration test in SwiftExcelFunctions — a mis-sized array formula
+  is supposed to carry `#N/A` in the cells its result cannot reach, and after a
+  round trip it carried nothing. Neither package's own tests could have shown it,
+  because each half was self-consistent.
+
 ## [0.20.0] - 2026-09-05
 
 ### Added
