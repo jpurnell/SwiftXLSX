@@ -7,6 +7,37 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-05
+
+### Fixed
+
+- **Array-formula members no longer read as constants.**
+
+  A legacy array formula is stored once, at the top-left cell of the range it
+  fills, with a `ref` naming the span. Every other cell in that span carries an
+  empty `<f/>` and its cached value:
+
+  ```xml
+  <c r="D55"><f t="array" ref="D55:D174">+TRANSPOSE(consol!H35:DW35)/1000</f><v>0</v></c>
+  <c r="D56"><f ca="1"/><v>-0.5</v></c>
+  ```
+
+  The reader captured `t` but never acted on `"array"` and never read its `ref`,
+  so the members fell through to their cached value — exactly the failure the
+  shared-formula and data-table branches already guard against, and their comment
+  already names: *"that would turn a computed cell into a constant silently."*
+  One workbook in the measured corpus lost **224 cells** that way, each a computed
+  cell presenting as an input.
+
+  Members are now marked `_ARRAY(anchor, span)` — computed *by* the anchor rather
+  than given a copy of its formula. That is the real dependency, since the formula
+  evaluates once and fills the rectangle; copying it would claim each of 120 cells
+  independently recomputes the whole array. The dependency graph picks the anchor
+  up from the marker's first argument with no further work: reading the workbook
+  above now gives D55 its 119 dependents.
+
+  An empty `<f/>` outside every span is untouched.
+
 ## [0.15.0] - 2026-09-05
 
 ### Changed

@@ -37,6 +37,17 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
     /// A data table's span and input cells, from the `<f t="dataTable">` attributes.
     private var currentDataTable: (span: String, inputs: [CellRef])?
 
+    /// The array-formula spans seen so far, each with the cell that carries the
+    /// formula and the span as written.
+    ///
+    /// A legacy array formula is stored once, at its top-left cell, with a `ref`
+    /// naming the rectangle it fills. The other cells in that rectangle carry an
+    /// empty `<f/>` and their cached value, so they are only recognizable as
+    /// computed by looking them up here. Excel writes cells in reading order and
+    /// the anchor is the top-left, so a span is always recorded before its members
+    /// are reached.
+    private var arrayFormulaSpans: [(anchor: CellRef, span: String, range: CellRange)] = []
+
     // MARK: - Row state
 
     private var currentRow = 0
@@ -138,6 +149,10 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
             if attributeDict["t"] == "dataTable" {
                 let inputs = ["r1", "r2"].compactMap { attributeDict[$0] }.map { CellRef($0) }
                 currentDataTable = (span: attributeDict["ref"] ?? "", inputs: inputs)
+            }
+            if attributeDict["t"] == "array", let ref = attributeDict["ref"] {
+                arrayFormulaSpans.append(
+                    (anchor: CellRef(currentCellRef), span: ref, range: CellRange(ref)))
             }
 
         // Auto-filter
@@ -248,6 +263,28 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
     // MARK: - Cell Commit
 
     /// Resolves the current cell state into a ``CellValue`` and writes it to the sheet.
+    /// The array formula that fills a cell, when the cell is one of its members.
+    ///
+    /// Returns `nil` for the anchor itself, which carries the formula text and is
+    /// handled as an ordinary formula cell, and for any cell outside every span —
+    /// an empty `<f/>` that belongs to no array formula must keep whatever
+    /// behaviour it had.
+    ///
+    /// - Parameter reference: The cell being closed, in A1 notation.
+    /// - Returns: The owning anchor and its span, or `nil`.
+    private func arrayFormulaOwner(of reference: String) -> (anchor: CellRef, span: String)? {
+        let cell = CellRef(reference)
+        for entry in arrayFormulaSpans {
+            guard entry.anchor != cell else { return nil }
+            guard cell.column >= entry.range.start.column,
+                  cell.column <= entry.range.end.column,
+                  cell.row >= entry.range.start.row,
+                  cell.row <= entry.range.end.row else { continue }
+            return (entry.anchor, entry.span)
+        }
+        return nil
+    }
+
     private func commitCell() {
         guard !currentCellRef.isEmpty else { return }
 
@@ -279,6 +316,27 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
             sheet?.setCell(
                 currentCellRef,
                 value: .formula(.function("_DATATABLE", arguments), cached: parseCachedValue()),
+                style: style
+            )
+            return
+        }
+
+        // An array-formula member. Its `<f>` element is empty because the formula
+        // lives at the span's top-left cell, so the same hazard applies as for a
+        // shared-formula member and a data table: fall through to the cached value
+        // and a computed cell silently becomes a constant. One workbook in the
+        // measured corpus loses 225 cells that way.
+        //
+        // The member is marked as computed *by its anchor* rather than given the
+        // anchor's formula. That is the true dependency — the formula evaluates
+        // once and fills the rectangle — and copying it would claim each of 120
+        // cells independently recomputes the whole array.
+        if let owner = arrayFormulaOwner(of: currentCellRef) {
+            sheet?.setCell(
+                currentCellRef,
+                value: .formula(
+                    .function("_ARRAY", [.cellRef(owner.anchor), .text(owner.span)]),
+                    cached: parseCachedValue()),
                 style: style
             )
             return

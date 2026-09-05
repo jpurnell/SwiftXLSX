@@ -295,6 +295,114 @@ final class ForeignWorkbookReadTests: XCTestCase {
         )
     }
 
+    // MARK: - Array formulas
+
+    // A legacy array formula is entered over a range and stored once: the top-left
+    // cell carries the text and a `ref` naming the span, and every other cell in
+    // the span carries an empty `<f/>` with its cached value.
+    //   <c r="D55"><f t="array" ref="D55:D174">TRANSPOSE(x)</f><v>0</v></c>
+    //   <c r="D56"><f ca="1"/><v>-0.5</v></c>
+    // The members fail the way a shared-formula member would: fall through to the
+    // cached value, and 119 computed cells read as constants.
+
+    func testArrayFormulaAnchorKeepsItsFormula() throws {
+        let sheet = try sharedFormulaSheet("""
+            <row r="1"><c r="A1">\
+            <f t="array" ref="A1:A3" ca="1">TRANSPOSE(B1:D1)</f><v>10</v></c></row>
+            """)
+
+        guard case .function(let name, _) =
+            try XCTUnwrap(sheet.cell(at: "A1")?.formulaAST) else {
+            return XCTFail("A1 became \(String(describing: sheet.cell(at: "A1")))")
+        }
+        XCTAssertEqual(name, "TRANSPOSE", "the anchor keeps the formula it was written with")
+    }
+
+    func testArrayFormulaMemberIsAFormulaNotAConstant() throws {
+        let sheet = try sharedFormulaSheet("""
+            <row r="1"><c r="A1">\
+            <f t="array" ref="A1:A3" ca="1">TRANSPOSE(B1:D1)</f><v>10</v></c></row>\
+            <row r="2"><c r="A2"><f ca="1"/><v>20</v></c></row>\
+            <row r="3"><c r="A3"><f ca="1"/><v>30</v></c></row>
+            """)
+
+        guard case .formula = sheet.cell(at: "A2") else {
+            return XCTFail("A2 became \(String(describing: sheet.cell(at: "A2")))")
+        }
+        guard case .formula = sheet.cell(at: "A3") else {
+            return XCTFail("A3 became \(String(describing: sheet.cell(at: "A3")))")
+        }
+    }
+
+    func testArrayFormulaMemberNamesItsAnchor() throws {
+        let sheet = try sharedFormulaSheet("""
+            <row r="1"><c r="A1">\
+            <f t="array" ref="A1:A3" ca="1">TRANSPOSE(B1:D1)</f><v>10</v></c></row>\
+            <row r="2"><c r="A2"><f ca="1"/><v>20</v></c></row>
+            """)
+
+        guard case .function(let name, let args) =
+            try XCTUnwrap(sheet.cell(at: "A2")?.formulaAST) else {
+            return XCTFail("Expected a marker function")
+        }
+        XCTAssertEqual(name, "_ARRAY")
+        XCTAssertEqual(args.first, .cellRef(CellRef("A1")),
+                       "the anchor is the cell this one is computed by")
+        XCTAssertEqual(args.dropFirst().first, .text("A1:A3"), "and the span it belongs to")
+    }
+
+    func testArrayFormulaMemberKeepsItsCachedValue() throws {
+        let sheet = try sharedFormulaSheet("""
+            <row r="1"><c r="A1">\
+            <f t="array" ref="A1:A3" ca="1">TRANSPOSE(B1:D1)</f><v>10</v></c></row>\
+            <row r="2"><c r="A2"><f ca="1"/><v>20</v></c></row>
+            """)
+
+        guard case .formula(_, let cached) = try XCTUnwrap(sheet.cell(at: "A2")) else {
+            return XCTFail("expected a formula")
+        }
+        XCTAssertEqual(cached, .number(20), "the value Excel recorded is the test oracle")
+    }
+
+    /// A span across columns, since the members are found by rectangle not by row.
+    func testArrayFormulaAcrossARow() throws {
+        let sheet = try sharedFormulaSheet("""
+            <row r="5"><c r="E5">\
+            <f t="array" ref="E5:G5" ca="1">TRANSPOSE(A1:A3)</f><v>1</v></c>\
+            <c r="F5"><f ca="1"/><v>2</v></c>\
+            <c r="G5"><f ca="1"/><v>3</v></c></row>
+            """)
+
+        for ref in ["F5", "G5"] {
+            guard case .function(let name, _) =
+                try XCTUnwrap(sheet.cell(at: ref)?.formulaAST) else {
+                return XCTFail("\(ref) became \(String(describing: sheet.cell(at: ref)))")
+            }
+            XCTAssertEqual(name, "_ARRAY", "\(ref) is inside the span")
+        }
+    }
+
+    /// A single-cell array formula owns only itself, so nothing else is claimed.
+    func testASingleCellArrayFormulaClaimsNothingElse() throws {
+        let sheet = try sharedFormulaSheet("""
+            <row r="1"><c r="A1">\
+            <f t="array" ref="A1" ca="1">SUM(B1:D1)</f><v>10</v></c>\
+            <c r="B1"><v>5</v></c></row>
+            """)
+
+        XCTAssertEqual(sheet.cell(at: "B1"), .number(5), "B1 is a constant and stays one")
+    }
+
+    /// An empty `<f/>` outside any span keeps whatever it did before — this change
+    /// must not reclassify cells it knows nothing about.
+    func testAnEmptyFormulaOutsideAnySpanIsUnchanged() throws {
+        let sheet = try sharedFormulaSheet("""
+            <row r="1"><c r="A1"><f ca="1"/><v>7</v></c></row>
+            """)
+
+        XCTAssertNotNil(sheet.cell(at: "A1"), "still read, one way or another")
+    }
+
     // MARK: - Data Tables
 
     // A What-If data table is written as a single self-closing formula element
