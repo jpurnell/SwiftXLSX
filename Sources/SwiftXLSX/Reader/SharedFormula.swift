@@ -50,7 +50,8 @@ enum SharedFormula {
             }
             return .sheetRef(SheetReference(sheet: reference.sheetName, range: shifted))
 
-        case .namedRange, .number, .text, .bool, .error:
+        // An absent argument shifts to itself: there is nothing in it to move.
+        case .namedRange, .number, .text, .bool, .error, .missing:
             return ast
 
         case .add(let lhs, let rhs):

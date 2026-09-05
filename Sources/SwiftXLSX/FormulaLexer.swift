@@ -75,6 +75,21 @@ public enum FormulaLexer {
                 continue
             }
 
+            // 6a. A trailing % scales the number just read: `0.25%` is 0.0025.
+
+            // A suffix, not an operator — nothing follows it to operate on.
+
+            if ch == "%", case .number(let value)? = tokens.last {
+
+                tokens[tokens.count - 1] = .number(value / 100)
+
+                pos += 1
+
+                continue
+
+            }
+
+
             // 7. $, letter or underscore: cell ref, boolean, or identifier.
             // A leading underscore is how Excel marks a function it did not
             // define itself — `_xll.` for an add-in, `_xlfn.` for one newer than

@@ -88,6 +88,14 @@ private struct TokenParser {
         return .eof
     }
 
+    /// The token after the current one, without consuming anything.
+    ///
+    /// One token of lookahead is enough to tell `1:1` — a whole row — from a
+    /// number that merely happens to start an expression.
+    var peek: FormulaToken {
+        position + 1 < tokens.count ? tokens[position + 1] : .eof
+    }
+
     /// Advances past the current token and returns it.
     @discardableResult
     mutating func advance() -> FormulaToken {
@@ -240,6 +248,18 @@ private struct TokenParser {
             advance()
             return try parseCellRefOrRange(ref)
 
+        case .number(let value) where TokenParser.rowIndex(of: value) != nil && peek == .colon:
+            guard let firstRow = TokenParser.rowIndex(of: value) else { break }
+            let saved = position
+            advance()
+            advance()
+            if case .number(let lastValue) = currentToken,
+               let lastRow = TokenParser.rowIndex(of: lastValue) {
+                advance()
+                return .cellRange(TokenParser.rowSpan(from: firstRow, to: lastRow))
+            }
+            position = saved
+
         case .columnRef, .rowRef:
             let start = currentToken
             advance()
@@ -360,10 +380,48 @@ private struct TokenParser {
 
     // MARK: - Identifier Dispatch
 
+    /// The row a number names, if it names one.
+    ///
+    /// `1:1` is a whole row written without `$`. A bare number lexes as a number,
+    /// so the parser recognises the pair rather than the lexer recognising either
+    /// half — the same rule as `A:A`, where a lone `A` could be a defined name.
+    static func rowIndex(of value: Double) -> Int? {
+        guard value == value.rounded(), value >= 1, value <= Double(lastRow) else { return nil }
+        return Int(value)
+    }
+
+    /// The column a word names, if it names one.
+    ///
+    /// `A` and `IV` are columns; `days_per_week` is not, and neither is anything
+    /// past Excel's 16,384th column.
+    static func columnIndex(of word: String) -> Int? {
+        guard !word.isEmpty, word.allSatisfy(\.isLetter) else { return nil }
+        var column = 0
+        for ch in word {
+            guard let value = ch.uppercased().unicodeScalars.first?.value else { return nil }
+            column = column * 26 + Int(value - 64)
+        }
+        return (1...lastColumn).contains(column) ? column : nil
+    }
+
     /// After consuming an `.identifier`, dispatches to function call, sheet
     /// reference, or named range based on the next token.
     private mutating func parseIdentifier(_ name: String) throws -> FormulaAST {
         guard currentToken != .eof else { return .namedRange(name) }
+
+        // `A:A` without the `$`. Only a column when both ends are columns —
+        // otherwise this is a defined name and the colon is somebody else's
+        // problem.
+        if currentToken == .colon, let first = TokenParser.columnIndex(of: name) {
+            let saved = position
+            advance()
+            if case .identifier(let endName) = currentToken,
+               let last = TokenParser.columnIndex(of: endName) {
+                advance()
+                return .cellRange(TokenParser.columnSpan(from: first, to: last))
+            }
+            position = saved
+        }
         switch currentToken {
         case .leftParen:
             return try parseFunctionCall(name)
@@ -377,6 +435,17 @@ private struct TokenParser {
     // MARK: - Function Call
 
     /// Parses a function call: `NAME(arg1, arg2, ...)`.
+    /// One argument, which may be absent.
+    ///
+    /// Absent means the next token closes the list or opens the next argument —
+    /// nothing stands between this comma and the one after it.
+    private mutating func parseArgument() throws -> FormulaAST {
+        if currentToken == .comma || currentToken == .rightParen {
+            return .missing
+        }
+        return try parseExpression()
+    }
+
     private mutating func parseFunctionCall(_ name: String) throws -> FormulaAST {
         guard currentToken == .leftParen else {
             throw FormulaParseError(
@@ -388,14 +457,15 @@ private struct TokenParser {
         try expect(.leftParen)
         var args: [FormulaAST] = []
 
+        // An argument may be left out. `IFERROR(x,)` omits the second and
+        // `ADDRESS(r, c, 1, , "S")` the fourth; the comma still marks the place,
+        // because position decides which parameter is which.
         if currentToken != .rightParen {
-            let firstArg = try parseExpression()
-            args.append(firstArg)
+            args.append(try parseArgument())
 
             while currentToken == .comma {
                 advance()
-                let nextArg = try parseExpression()
-                args.append(nextArg)
+                args.append(try parseArgument())
             }
         }
 
@@ -435,6 +505,49 @@ private struct TokenParser {
                 )
             }
             return .sheetRef(SheetReference(sheet: name, range: range))
+        }
+
+        // `Comp!1:1` — a whole row without the `$`, on a named sheet.
+        if case .number(let firstValue) = currentToken, let firstRow = TokenParser.rowIndex(of: firstValue) {
+            let saved = position
+            advance()
+            if currentToken == .colon {
+                advance()
+                if case .number(let lastValue) = currentToken,
+                   let lastRow = TokenParser.rowIndex(of: lastValue) {
+                    advance()
+                    return .sheetRef(SheetReference(
+                        sheet: name, range: TokenParser.rowSpan(from: firstRow, to: lastRow)))
+                }
+            }
+            position = saved
+        }
+
+        // `'Paid Cost - Input+Calc'!A:A` — a whole column without the `$`, on a
+        // named sheet. Same rule as the unqualified form: a column only when both
+        // ends are columns.
+        if case .identifier(let first) = currentToken, let firstColumn = TokenParser.columnIndex(of: first) {
+            let saved = position
+            advance()
+            if currentToken == .colon {
+                advance()
+                if case .identifier(let last) = currentToken,
+                   let lastColumn = TokenParser.columnIndex(of: last) {
+                    advance()
+                    return .sheetRef(SheetReference(
+                        sheet: name,
+                        range: TokenParser.columnSpan(from: firstColumn, to: lastColumn)))
+                }
+            }
+            position = saved
+        }
+
+        // `CB_DATA_!#REF!` — the sheet is named and the reference on it is broken.
+        // The error is the value, and saying so keeps the formula readable rather
+        // than discarding the whole thing.
+        if case .error(let excelError) = currentToken {
+            advance()
+            return .error(excelError)
         }
 
         guard case .cellRef(let startRef) = currentToken else {

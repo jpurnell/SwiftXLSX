@@ -334,7 +334,8 @@ public struct DependencyGraph: Sendable {
             // Named range resolution requires a NameResolver; skip for now
             return []
 
-        case .number, .text, .bool, .error:
+        case .number, .text, .bool, .error, .missing:
+            // An argument that is not there reads nothing.
             return []
 
         case .add(let l, let r),

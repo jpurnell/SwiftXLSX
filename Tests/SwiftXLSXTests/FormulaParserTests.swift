@@ -782,26 +782,23 @@ final class FormulaParserTests: XCTestCase {
     }
 
     func testMissingFunctionArgAfterComma() {
-        // SUM(1, )
-        XCTAssertThrowsError(
-            try parse(
-                .identifier("SUM"), .leftParen,
-                .number(1), .comma,
-                .rightParen
-            )
-        ) { error in
-            guard let parseError = error as? FormulaParseError else {
-                XCTFail("Expected FormulaParseError")
-                return
-            }
-            if case .unexpectedToken = parseError.kind {
-                // Expected - ) found where expression expected
-            } else {
-                XCTFail("Expected unexpectedToken, got \(parseError.kind)")
-            }
+        // `SUM(1, )` — the second argument is left out.
+        //
+        // This asserted a thrown error until 0.14.0. It was wrong about Excel:
+        // an omitted argument is ordinary, the comma marks its place because
+        // position decides which parameter is which, and about 21,500 formulas
+        // in the measured corpus depend on it. `FormulaAST.missing` now says so.
+        let ast = try? parse(
+            .identifier("SUM"), .leftParen,
+            .number(1), .comma,
+            .rightParen
+        )
+        guard case .function("SUM", let args)? = ast else {
+            return XCTFail("expected SUM(...), got \(String(describing: ast))")
         }
+        XCTAssertEqual(args.count, 2, "the omitted argument still occupies its position")
+        XCTAssertEqual(args[1], .missing)
     }
-
     func testMissingOperandAfterOperator() {
         // 1 +
         XCTAssertThrowsError(try parse(.number(1), .plus)) { error in

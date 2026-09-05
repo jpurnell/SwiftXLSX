@@ -22,15 +22,12 @@ final class FormulaParserGapTests: XCTestCase {
     /// `IFERROR(x,)` means "and empty if it errors". Excel allows an argument to
     /// be left out; the comma still marks its place.
     func testOmittedTrailingArgument() {
-        XCTExpectFailure("Omitted arguments are unrepresented — FormulaAST has no case for one, "
-            + "and inventing a value would be a lie about what the sheet says. ~41,000 formulas.")
         XCTAssertTrue(parses("IFERROR(B5/C5-1,)"))
     }
 
     /// `ADDRESS(row, col, 1, , "Sheet")` omits the fourth argument between two
     /// commas, which is the same rule in the middle rather than at the end.
     func testOmittedMiddleArgument() {
-        XCTExpectFailure("Same gap, in the middle rather than at the end.")
         XCTAssertTrue(parses("ADDRESS($C27,AZ$3,1,,\"Lease Revenue\")"))
     }
 
@@ -78,7 +75,6 @@ final class FormulaParserGapTests: XCTestCase {
     /// `0.25%` is a number with a suffix. Found only after the lexer stopped
     /// failing earlier in these formulas — the fifth gap was hiding the sixth.
     func testPercentLiteral() {
-        XCTExpectFailure("A percent suffix is unlexed. Small, and now visible.")
         XCTAssertTrue(parses("L4+0.25%"))
     }
 
@@ -87,5 +83,43 @@ final class FormulaParserGapTests: XCTestCase {
     /// A formula can name a cell whose reference broke. The error is the value.
     func testErrorLiteralAsAValue() {
         XCTAssertTrue(parses("IFERROR(#REF!,0)"))
+    }
+
+    /// The sheet is named and the reference on it is broken.
+    func testErrorLiteralAfterASheetName() {
+        XCTAssertTrue(parses("CB_DATA_!#REF!"))
+    }
+
+    // MARK: - Bare column ranges, no dollar (~40 formulas)
+
+    /// `A:A` is the same range as `$A:$A`. The lexer cannot tell `A` from a
+    /// defined name, so the parser decides once it has seen the colon and a
+    /// second word that is also a column.
+    func testBareColumnRangeOnAQuotedSheet() {
+        XCTAssertTrue(parses("MAX('Paid Cost - Input+Calc'!A:A)"))
+    }
+
+    /// `Comp!1:1` — a whole row without the `$`. A bare number lexes as a number,
+    /// so the parser recognises the pair rather than the lexer recognising a half.
+    func testBareRowRangeOnANamedSheet() {
+        XCTAssertTrue(parses("MATCH($A5,Comp!1:1,0)"))
+    }
+
+    func testABareWordFollowedByAColonIsStillANameWhenItIsNotAColumn() throws {
+        // `days_per_week` is not a column, so nothing here is a range.
+        XCTAssertNotNil(try? FormulaParser.parse("SUM(days_per_week)"))
+    }
+
+    // MARK: - Round trip
+
+    /// Every form above must survive being written back out, or the parser has
+    /// only half solved the problem.
+    func testTheseFormsSurviveARoundTrip() throws {
+        for formula in ["IFERROR(B5/C5-1,)", "SUM($E:$E)", "L4+0.25%", "_xll.PsiNormal(C3,C4)"] {
+            let ast = try FormulaParser.parse(formula)
+            let written = FormulaSerializer.serialize(ast)
+            let reparsed = try FormulaParser.parse(written)
+            XCTAssertEqual(ast, reparsed, "\(formula) → \(written)")
+        }
     }
 }

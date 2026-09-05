@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-04
+
+**The parser reads what real workbooks contain.** Measured across 79 of them — teaching models, a
+production credit model and a 104-sheet media model — formulas that fail to parse fall from
+**292,437 to 17**, of 549,059. From 53% of the corpus to 0.003%.
+
+### Added
+- **Omitted arguments.** `IFERROR(B5/C5-1,)` and `ADDRESS(r, c, 1, , "Sheet")` parse, with the
+  empty position becoming `FormulaAST.missing`. The comma marks the place because position decides
+  which parameter is which. ~21,500 formulas.
+- **Whole-column and whole-row ranges**, with and without `$`: `$E:$E`, `A:A`, `$2:$3`, `Comp!1:1`,
+  `'Lease Revenue'!$2:$3`. They become ordinary ranges over Excel's grid, so no new AST case was
+  needed. ~135,000 formulas.
+- **Underscores and dots inside words.** `days_per_week`, `COVARIANCE.P`, and the `_xll.` and
+  `_xlfn.` prefixes Excel writes for add-in and newer-than-the-format functions. ~116,000 formulas.
+- **A percent suffix.** `L4+0.25%` — a scale on the number just read, not an operator.
+- **An error literal after a sheet name.** `CB_DATA_!#REF!`.
+- `FormulaToken.columnRef` and `.rowRef`, produced only for a `$`-marked word that names only a
+  column or only a row.
+
+### Changed
+- **`DependencyGraph` no longer enumerates enormous ranges.** Above 4,096 cells a range is
+  intersected with the cells that exist. This is not a cap but the better answer: `$B:$G` is a
+  request for whatever is in those columns, not for 6,291,456 addresses, and the corpus writes such
+  a range about 135,000 times. Below the limit nothing changed — `A1:A5` still names five cells
+  whether or not they hold anything.
+- Depends on **SwiftExcelCore 0.2.0** for `FormulaAST.missing`.
+
+### Fixed
+- `testMissingFunctionArgAfterComma` asserted that an omitted argument throws. It was wrong about
+  Excel, and now asserts the parse.
+
+### Notes
+What remains unparsed is 17 formulas: 12 nesting `INDIRECT(ADDRESS(...))` inside `ISREF`/`INDEX`,
+3 with a range whose endpoint is a function call, and 2 array literals `{10,20,30}`. Array
+literals would need a new `FormulaAST` case for two formulas, which is not a trade worth making
+today.
+
 ## [0.13.0] - 2026-09-04
 
 **The function library moved to SwiftExcelFunctions.** This package is now syntax and storage:

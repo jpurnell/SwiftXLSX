@@ -17,6 +17,9 @@ public enum FormulaSerializer {
             return 1
         case .concatenate:
             return 2
+        case .missing:
+            // An absent argument binds to nothing, so it never needs bracketing.
+            return .max
         case .add, .subtract:
             return 3
         case .multiply, .divide:
@@ -38,6 +41,10 @@ public enum FormulaSerializer {
     private static func serializeNode(_ ast: FormulaAST, depth: Int) -> String {
         guard depth < maxDepth else { return "#VALUE!" }
         switch ast {
+        case .missing:
+            // Nothing between the commas, which is how the sheet wrote it. This is
+            // what makes `IFERROR(B5/C5-1,)` survive a round trip unchanged.
+            return ""
         case .cellRef(let ref):
             return ref.reference
         case .cellRange(let range):
