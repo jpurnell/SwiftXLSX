@@ -673,6 +673,52 @@ final class ForeignWorkbookReadTests: XCTestCase {
                        "one cell, not a second under a marked key")
     }
 
+    // Normalising the *storage key* must not normalise the *references*. A cell has
+    // no absoluteness — `$D$66` and `D66` are the same cell — but a reference does,
+    // and `$` is what decides whether it moves when the formula is copied. Losing
+    // the markers would silently change what every copied formula means.
+
+    func testAbsoluteMarkersSurviveARoundTrip() throws {
+        let sheet = try roundTripped { sheet in
+            sheet.write(5, to: "D66")
+            sheet.writeFormula("$D$66*2", to: "A1")
+            sheet.writeFormula("$D66+D$66", to: "A2")
+        }
+
+        XCTAssertEqual(FormulaSerializer.serialize(try XCTUnwrap(sheet.formulaAST(at: "A1"))),
+                       "$D$66*2", "a fully absolute reference keeps both markers")
+        XCTAssertEqual(FormulaSerializer.serialize(try XCTUnwrap(sheet.formulaAST(at: "A2"))),
+                       "$D66+D$66", "mixed references keep the marker they had")
+    }
+
+    /// And the cell element itself is written unmarked, which is what Excel does.
+    func testACellIsWrittenWithAPlainReference() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.apply([CellRef("$D$66"): .number(5)])
+        let entries = try SwiftZIP.ZIPReader.read(from: try workbook.save())
+        let xml = try XCTUnwrap(
+            entries.first { $0.path.hasSuffix("sheet1.xml") }.map {
+                String(decoding: $0.data, as: UTF8.self)
+            })
+
+        XCTAssertTrue(xml.contains("<c r=\"D66\""), "the cell is at D66")
+        XCTAssertFalse(xml.contains("r=\"$D$66\""), "a cell reference carries no markers")
+    }
+
+    /// The two together: a marked reference reads the cell, and still writes marked.
+    func testAnAbsoluteReferenceBothResolvesAndSerialises() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.write(7, to: "D66")
+        sheet.writeFormula("$D$66", to: "A1")
+
+        let provider = WorkbookValueProvider(workbook: workbook, currentSheet: "Sheet1")
+        XCTAssertEqual(provider.value(at: CellRef("$D$66")), .number(7), "it finds the cell")
+        XCTAssertEqual(FormulaSerializer.serialize(try XCTUnwrap(sheet.formulaAST(at: "A1"))),
+                       "$D$66", "and still says $D$66")
+    }
+
     // MARK: - Data Tables
 
     // A What-If data table is written as a single self-closing formula element
