@@ -3,12 +3,13 @@ import SwiftExcelCore
 extension Worksheet {
     /// Returns the value at the given cell reference, or `nil` if the cell is empty.
     ///
-    /// This uses the ``CellRef/reference`` property to key into the cell dictionary.
+    /// Markers are ignored: `$D$66` and `D66` name the same cell, and `$` says how
+    /// a reference behaves when a formula is copied rather than where it points.
     ///
     /// - Parameter ref: The cell reference to look up.
     /// - Returns: The cell value, or `nil` if the cell is empty.
     func value(at ref: CellRef) -> CellValue? {
-        cells[ref.reference]?.0
+        cells[Worksheet.storageKey(for: ref)]?.0
     }
 
     /// Returns all non-nil values in the given cell range.

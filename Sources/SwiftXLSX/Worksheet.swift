@@ -47,6 +47,24 @@ public final class Worksheet: @unchecked Sendable {
         self.name = name
     }
 
+    /// The dictionary key for a cell, with any `$` markers removed.
+    ///
+    /// `$D$66` and `D66` name the same cell; the markers say how a reference behaves
+    /// when a formula is copied, not where it points. The store is keyed by the
+    /// plain form the file uses, so every lookup and every write has to normalise —
+    /// and a lookup that does not simply misses, silently, as an empty cell.
+    ///
+    /// ``DependencyGraph`` learned this separately and strips markers of its own;
+    /// the value lookup did not, so every absolute reference in every workbook read
+    /// as blank until a corpus comparison against Excel's cached values found it.
+    ///
+    /// - Parameter ref: The reference, as written.
+    /// - Returns: The unmarked key.
+    static func storageKey(for ref: CellRef) -> String {
+        guard ref.absoluteColumn || ref.absoluteRow else { return ref.reference }
+        return CellRef(column: ref.column, row: ref.row).reference
+    }
+
     /// Writes one cell and keeps ``lastPopulatedCell`` true.
     ///
     /// Every write goes through here. The bound is only as good as the guarantee
@@ -179,7 +197,7 @@ public final class Worksheet: @unchecked Sendable {
             for column in range.start.column...range.end.column {
                 let cell = CellRef(column: column, row: row)
                 guard cell != anchor else { continue }
-                store(cell.reference, (
+                store(Self.storageKey(for: cell), (
                     .formula(
                         .function("_ARRAY", [.cellRef(anchor), .text(range.reference)]),
                         cached: nil),
@@ -213,12 +231,13 @@ public final class Worksheet: @unchecked Sendable {
     /// - Parameter assignment: The values, by cell.
     public func apply(_ assignment: [CellRef: CellValue]) {
         for (cell, value) in assignment {
-            let existing = cells[cell.reference]
+            let key = Self.storageKey(for: cell)
+            let existing = cells[key]
             let style = existing?.1 ?? .general
             if case .formula(let ast, _)? = existing?.0 {
-                store(cell.reference, (.formula(ast, cached: value), style))
+                store(key, (.formula(ast, cached: value), style))
             } else {
-                store(cell.reference, (value, style))
+                store(key, (value, style))
             }
         }
     }

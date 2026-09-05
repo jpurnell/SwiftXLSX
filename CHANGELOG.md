@@ -7,6 +7,29 @@
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-05
+
+### Fixed
+
+- **An absolute reference no longer reads as an empty cell.**
+
+  `CellRef.reference` renders the `$` markers, and `Worksheet.value(at:)` used it as
+  the dictionary key — but the store is keyed by the plain reference the file writes
+  (`r="D66"`). So `$D$66` missed, silently, as `nil` rather than an error, and every
+  absolute reference in every workbook read as blank.
+
+  `$` says how a reference behaves when a formula is copied, not where it points.
+  Lookups and writes now normalise the key in one place, `Worksheet.storageKey(for:)`.
+  `DependencyGraph` had already learned this and strips markers of its own; the value
+  lookup never did.
+
+  Found by comparing a corpus workbook against Excel's own cached values: every
+  `=D22/$D$66` in it answered `#DIV/0!` because the divisor came back nil. It was the
+  whole of that workbook's `#DIV/0!` bucket.
+
+  `apply(_:)` and `spill(_:over:)` had the same latent fault — a value written
+  through an absolute reference would have been stored under a key nothing could read.
+
 ## [0.21.0] - 2026-09-05
 
 ### Fixed

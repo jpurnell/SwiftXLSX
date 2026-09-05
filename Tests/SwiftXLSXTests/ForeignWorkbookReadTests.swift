@@ -617,6 +617,62 @@ final class ForeignWorkbookReadTests: XCTestCase {
         XCTAssertEqual(cached, .bool(true))
     }
 
+    // MARK: - Absolute references
+
+    // `$D$66` and `D66` name the same cell. `CellRef.reference` renders the markers,
+    // and the cell store is keyed by the plain reference the file uses, so keying a
+    // lookup on the rendered form misses every absolute reference — silently, as an
+    // empty cell rather than an error.
+    //
+    // Found by comparing a corpus workbook against Excel's own cached values: every
+    // `=D22/$D$66` answered `#DIV/0!` because the divisor came back nil.
+
+    func testAnAbsoluteReferenceFindsTheCell() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.write(42, to: "D66")
+
+        XCTAssertEqual(sheet.value(at: CellRef("D66")), .number(42))
+        XCTAssertEqual(sheet.value(at: CellRef("$D$66")), .number(42), "absolute names the same cell")
+        XCTAssertEqual(sheet.value(at: CellRef("$D66")), .number(42), "mixed, column absolute")
+        XCTAssertEqual(sheet.value(at: CellRef("D$66")), .number(42), "mixed, row absolute")
+    }
+
+    func testAnAbsoluteReferenceReadsThroughTheProvider() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.write(10, to: "D66")
+        let provider = WorkbookValueProvider(workbook: workbook, currentSheet: "Sheet1")
+
+        XCTAssertEqual(provider.value(at: CellRef("$D$66")), .number(10))
+        XCTAssertEqual(provider.value(at: CellRef("$D$66"), inSheet: "Sheet1"), .number(10))
+    }
+
+    /// A matrix read is derived from `value(at:)`, so it inherits the same fix.
+    func testAnAbsoluteRangeReadsItsCells() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.write(1, to: "A1")
+        sheet.write(2, to: "A2")
+        let provider = WorkbookValueProvider(workbook: workbook, currentSheet: "Sheet1")
+
+        let matrix = provider.matrix(in: CellRange(from: CellRef("$A$1"), to: CellRef("$A$2")))
+        XCTAssertEqual(matrix.elements, [.number(1), .number(2)])
+    }
+
+    /// Writing through an absolute reference lands on the same cell too, or a
+    /// spilled result would be stored where nothing can read it.
+    func testApplyingToAnAbsoluteReferenceHitsTheSameCell() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.write(1, to: "B2")
+        sheet.apply([CellRef("$B$2"): .number(99)])
+
+        XCTAssertEqual(sheet.value(at: CellRef("B2")), .number(99))
+        XCTAssertEqual(sheet.cellReferences.filter { $0.contains("B2") }.count, 1,
+                       "one cell, not a second under a marked key")
+    }
+
     // MARK: - Data Tables
 
     // A What-If data table is written as a single self-closing formula element
