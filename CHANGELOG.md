@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-05
+
+### Changed
+
+- Depends on SwiftExcelCore `0.3.0`, in which `CellValue.array` carries a `CellMatrix`
+  rather than a flat `[CellValue]`.
+
+  Nothing here needed editing. The single site that touches the case is a bare
+  `case .array:`, which matches regardless of payload — so this is a rebuild against a
+  breaking upstream change, not an adoption of one. `Workbook`'s `CellValueProvider`
+  conformance picks up the new shaped read from the protocol's default implementation.
+
+### Breaking
+
+- Transitively, through the re-exported SwiftExcelCore: callers that bind the payload of
+  `CellValue.array` need updating. See SwiftExcelCore's 0.3.0 entry for why.
+
 ## [0.14.0] - 2026-09-04
 
 **The parser reads what real workbooks contain.** Measured across 79 of them — teaching models, a
