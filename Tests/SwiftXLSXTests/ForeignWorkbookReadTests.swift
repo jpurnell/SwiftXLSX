@@ -488,6 +488,88 @@ final class ForeignWorkbookReadTests: XCTestCase {
         XCTAssertFalse(xml.contains("t=\"array\""))
     }
 
+    // MARK: - Spilling a result
+
+    // Reading and writing an array formula leaves one thing undone: the cells it
+    // fills have no values until something evaluates it. `spill(_:over:)` takes an
+    // already-evaluated result and writes it across the span, which is what makes
+    // a workbook this library produced open with numbers in it rather than blanks.
+
+    func testSpillWritesTheResultAcrossTheSpan() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.writeArrayFormula("TRANSPOSE(A1:A3)", over: CellRange(from: "C1", to: "E1"))
+        sheet.spill(CellMatrix(row: [.number(10), .number(20), .number(30)]),
+                    over: CellRange(from: "C1", to: "E1"))
+
+        for (ref, expected) in [("C1", 10.0), ("D1", 20.0), ("E1", 30.0)] {
+            guard case .formula(_, let cached)? = sheet.cell(at: ref) else {
+                return XCTFail("\(ref) is not a formula: \(String(describing: sheet.cell(at: ref)))")
+            }
+            XCTAssertEqual(cached, .number(expected), "\(ref)")
+        }
+    }
+
+    /// Spilling keeps each cell's formula — the anchor's text, the members' marker.
+    func testSpillDoesNotDisturbTheFormulas() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.writeArrayFormula("TRANSPOSE(A1:A2)", over: CellRange(from: "C1", to: "D1"))
+        sheet.spill(CellMatrix(row: [.number(1), .number(2)]),
+                    over: CellRange(from: "C1", to: "D1"))
+
+        guard case .function(let anchor, _) = try XCTUnwrap(sheet.formulaAST(at: "C1")) else {
+            return XCTFail("C1 lost its formula")
+        }
+        XCTAssertEqual(anchor, "TRANSPOSE")
+        guard case .function(let marker, _) = try XCTUnwrap(sheet.formulaAST(at: "D1")) else {
+            return XCTFail("D1 lost its marker")
+        }
+        XCTAssertEqual(marker, "_ARRAY")
+    }
+
+    /// A span larger than the result shows `#N/A` where nothing reached.
+    func testSpillPadsAShortResult() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.writeArrayFormula("TRANSPOSE(A1:A2)", over: CellRange(from: "C1", to: "E1"))
+        sheet.spill(CellMatrix(row: [.number(1), .number(2)]),
+                    over: CellRange(from: "C1", to: "E1"))
+
+        guard case .formula(_, let cached)? = sheet.cell(at: "E1") else {
+            return XCTFail("E1 is not a formula")
+        }
+        XCTAssertEqual(cached, .error(.na))
+    }
+
+    /// Spilling onto cells that hold no formula writes plain values, so the same
+    /// call serves a caller who just wants a block of numbers written.
+    func testSpillOntoEmptyCellsWritesValues() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.spill(CellMatrix(row: [.number(1), .number(2)]),
+                    over: CellRange(from: "C1", to: "D1"))
+
+        XCTAssertEqual(sheet.cell(at: "C1"), .number(1))
+        XCTAssertEqual(sheet.cell(at: "D1"), .number(2))
+    }
+
+    /// And the values survive a save and reload, which is the whole point.
+    func testASpilledArrayFormulaRoundTripsWithItsValues() throws {
+        let sheet = try roundTripped { sheet in
+            sheet.writeArrayFormula("TRANSPOSE(A1:A3)", over: CellRange(from: "C1", to: "E1"))
+            sheet.spill(CellMatrix(row: [.number(10), .number(20), .number(30)]),
+                        over: CellRange(from: "C1", to: "E1"))
+        }
+
+        for (ref, expected) in [("C1", 10.0), ("D1", 20.0), ("E1", 30.0)] {
+            guard case .formula(_, let cached)? = sheet.cell(at: ref) else {
+                return XCTFail("\(ref) came back as \(String(describing: sheet.cell(at: ref)))")
+            }
+            XCTAssertEqual(cached, .number(expected), "\(ref)")
+        }
+    }
+
     // MARK: - Data Tables
 
     // A What-If data table is written as a single self-closing formula element

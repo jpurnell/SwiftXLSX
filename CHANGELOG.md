@@ -7,6 +7,30 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-05
+
+### Added
+
+- **`Worksheet.spill(_:over:)`** — writes an evaluated result across a span.
+
+  Reading and writing an array formula left one thing undone: the cells it fills
+  have no values until something evaluates it. This writes them, reconciling the
+  result's shape against the span's through `CellMatrix.spilled(toRows:columns:)`.
+
+  A cell that already holds a formula keeps it and gains a cached value, which is
+  how Excel stores a calculated array formula. A cell holding no formula simply
+  receives the value, so the same call also serves a caller who wants a block of
+  numbers written.
+
+  The result is supplied rather than computed. This package does not evaluate
+  anything and does not depend on the evaluator; `FormulaEvaluator.spill` in
+  SwiftExcelFunctions produces a result, and this applies one. Neither package
+  needs to know about the other.
+
+### Changed
+
+- Depends on SwiftExcelCore `0.5.0`.
+
 ## [0.17.0] - 2026-09-05
 
 ### Added

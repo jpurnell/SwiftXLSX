@@ -184,6 +184,52 @@ public final class Worksheet: @unchecked Sendable {
         }
     }
 
+    /// Writes an evaluated result across a span.
+    ///
+    /// One formula fills a rectangle, and until something evaluates it those cells
+    /// have no values. This writes them: each cell of `range` takes its element of
+    /// `matrix`, reconciled by
+    /// `CellMatrix.spilled(toRows:columns:)` — a vector broadcasts,
+    /// unreachable cells become `#N/A`, and anything that does not fit is dropped.
+    ///
+    /// A cell that already holds a formula keeps it and gains a cached value, which
+    /// is how Excel stores a calculated array formula. A cell that holds no formula
+    /// simply receives the value, so the same call also serves a caller who wants a
+    /// block of numbers written and nothing more.
+    ///
+    /// This package does not evaluate anything, so the result is supplied rather
+    /// than computed — `SwiftExcelFunctions.FormulaEvaluator.spill(_:over:…)`
+    /// produces one.
+    ///
+    /// ```swift
+    /// let workbook = Workbook()
+    /// let sheet = workbook.addSheet(name: "Sheet1")
+    /// sheet.writeArrayFormula("TRANSPOSE(A1:A3)", over: CellRange(from: "C1", to: "E1"))
+    /// sheet.spill(CellMatrix(row: [.number(10), .number(20), .number(30)]),
+    ///             over: CellRange(from: "C1", to: "E1"))
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - matrix: The evaluated result.
+    ///   - range: The span it fills.
+    public func spill(_ matrix: CellMatrix, over range: CellRange) {
+        let filled = matrix.spilled(toRows: range.rowCount, columns: range.columnCount)
+        for row in 0..<filled.rows {
+            for column in 0..<filled.columns {
+                let cell = CellRef(column: range.start.column + column,
+                                   row: range.start.row + row)
+                let value = filled[row, column]
+                let existing = cells[cell.reference]
+                let style = existing?.1 ?? .general
+                if case .formula(let ast, _)? = existing?.0 {
+                    store(cell.reference, (.formula(ast, cached: value), style))
+                } else {
+                    store(cell.reference, (value, style))
+                }
+            }
+        }
+    }
+
     /// Returns the formula AST at the given cell reference, if any.
     public func formulaAST(at ref: String) -> FormulaAST? {
         cells[ref]?.0.formulaAST
