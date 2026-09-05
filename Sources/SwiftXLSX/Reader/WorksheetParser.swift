@@ -151,8 +151,10 @@ final class WorksheetParser: NSObject, XMLParserDelegate {
                 currentDataTable = (span: attributeDict["ref"] ?? "", inputs: inputs)
             }
             if attributeDict["t"] == "array", let ref = attributeDict["ref"] {
-                arrayFormulaSpans.append(
-                    (anchor: CellRef(currentCellRef), span: ref, range: CellRange(ref)))
+                let anchor = CellRef(currentCellRef)
+                let range = CellRange(ref)
+                arrayFormulaSpans.append((anchor: anchor, span: ref, range: range))
+                sheet?.addArrayFormula(anchor: anchor, span: range)
             }
 
         // Auto-filter

@@ -215,6 +215,17 @@ public final class Workbook: @unchecked Sendable {
                 case .bool(let b):
                     xml += "<c r=\"\(ref)\" t=\"b\" s=\"\(styleId)\"><v>\(b ? 1 : 0)</v></c>"
                 case .formula(let ast, let cached):
+                    // A member of an array formula's span. Excel stores the formula
+                    // once, at the anchor, and leaves every other cell an empty
+                    // `<f/>`. `_ARRAY` is our internal mark for that and is not a
+                    // function Excel knows, so serializing it would fill the span
+                    // with `#NAME?`.
+                    if case .function("_ARRAY", _) = ast {
+                        xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><f/>"
+                        xml += cachedValueXML(cached)
+                        xml += "</c>"
+                        continue
+                    }
                     let formulaBody: String
                     if case .function("_RAW", let args) = ast,
                        let first = args.first, case .text(let raw) = first {
@@ -222,7 +233,13 @@ public final class Workbook: @unchecked Sendable {
                     } else {
                         formulaBody = FormulaSerializer.serialize(ast)
                     }
-                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><f>\(escapeXML(formulaBody))</f>"
+                    // The anchor names the rectangle it fills, which is the only
+                    // record that the members belong to it.
+                    let arrayAttributes = sheet.arrayFormulas
+                        .first { $0.anchor.reference == CellRef(ref).reference }
+                        .map { " t=\"array\" ref=\"\($0.span.reference)\"" } ?? ""
+                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\">"
+                    xml += "<f\(arrayAttributes)>\(escapeXML(formulaBody))</f>"
                     if let cached = cached {
                         switch cached {
                         case .number(let n):
@@ -272,6 +289,29 @@ public final class Workbook: @unchecked Sendable {
 
         xml += "</worksheet>"
         return xml
+    }
+
+    /// The `<v>` element recording what a formula last evaluated to, if anything.
+    ///
+    /// Excel stores a cached result for every formula cell, which is what makes a
+    /// workbook usable as a test oracle — so it is written back rather than
+    /// dropped. Shared by ordinary formulas and by array-formula members, which
+    /// have no formula text of their own but do have a value.
+    ///
+    /// - Parameter cached: The cached value, if the cell has one.
+    /// - Returns: The XML fragment, or an empty string.
+    private func cachedValueXML(_ cached: CellValue?) -> String {
+        guard let cached else { return "" }
+        switch cached {
+        case .number(let number):
+            let formatted = number.truncatingRemainder(dividingBy: 1) == 0
+                ? String(Int(number)) : String(number)
+            return "<v>\(formatted)</v>"
+        case .text(let text):
+            return "<v>\(escapeXML(text))</v>"
+        default:
+            return ""
+        }
     }
 
     private func validationXML(range: CellRange, type: ValidationType) -> String {

@@ -7,6 +7,42 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-05
+
+### Added
+
+- **`Worksheet.writeArrayFormula(_:over:)`** — one formula filling a rectangle.
+
+  The anchor is written with `t="array"` and a `ref` naming its span; every other
+  cell in the span is written as an empty `<f/>`, which is how Excel stores it.
+  Spans are sheet-level state alongside merged cells and the auto-filter, because
+  that is what an array formula is: a statement about a rectangle. Keeping it out
+  of the anchor's `CellValue` leaves that formula's AST exactly what the author
+  wrote.
+
+- `Worksheet.lastPopulatedCell`, the far corner of everything a sheet holds.
+  Maintained on write rather than scanned on read, since it is asked once per range
+  read during evaluation.
+
+### Fixed
+
+- **The `_ARRAY` marker no longer reaches the file.**
+
+  0.16.0 taught the reader to mark array-formula members, but the writer knew
+  nothing about it and serialized the marker as a formula. A workbook read and
+  written back would have opened in Excel with `#NAME?` in every member — 224 cells
+  in the workbook that prompted the change. Members now write as the empty `<f/>`
+  they arrived as, keeping their cached values.
+
+  Verified by round-tripping that workbook: 224 members in, 224 out, no marker in
+  the file, `t="array"` present.
+
+### Changed
+
+- `WorkbookValueProvider` answers `lastPopulatedCell`, which is what lets
+  SwiftExcelCore 0.4.0 read a whole-column reference without materializing a
+  million cells. Depends on SwiftExcelCore `0.4.0`.
+
 ## [0.16.0] - 2026-09-05
 
 ### Fixed

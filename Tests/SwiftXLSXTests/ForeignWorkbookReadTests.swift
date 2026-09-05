@@ -403,6 +403,91 @@ final class ForeignWorkbookReadTests: XCTestCase {
         XCTAssertNotNil(sheet.cell(at: "A1"), "still read, one way or another")
     }
 
+    // MARK: - Array formulas, written
+
+    // Reading one is only half a round trip. Written back, the anchor must carry
+    // `t="array"` and its `ref`, and the members must be empty `<f/>` elements —
+    // otherwise the `_ARRAY` marker that makes them computed cells in memory is
+    // serialized into the file as if it were a function Excel knows.
+
+    private func roundTripped(_ build: (Worksheet) -> Void) throws -> Worksheet {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        build(sheet)
+        let reread = try Workbook(xlsxData: try workbook.save())
+        return try XCTUnwrap(reread.sheets.first)
+    }
+
+    func testAnArrayFormulaSurvivesARoundTrip() throws {
+        let sheet = try roundTripped { sheet in
+            sheet.writeArrayFormula("TRANSPOSE(B1:D1)", over: CellRange(from: "A1", to: "A3"))
+        }
+
+        guard case .function(let name, _) =
+            try XCTUnwrap(sheet.cell(at: "A1")?.formulaAST) else {
+            return XCTFail("A1 became \(String(describing: sheet.cell(at: "A1")))")
+        }
+        XCTAssertEqual(name, "TRANSPOSE", "the anchor keeps its formula")
+
+        for ref in ["A2", "A3"] {
+            guard case .function(let marker, let args) =
+                try XCTUnwrap(sheet.cell(at: ref)?.formulaAST) else {
+                return XCTFail("\(ref) became \(String(describing: sheet.cell(at: ref)))")
+            }
+            XCTAssertEqual(marker, "_ARRAY", "\(ref) is still a member")
+            XCTAssertEqual(args.first, .cellRef(CellRef("A1")))
+        }
+    }
+
+    /// The marker must never reach the file as a formula.
+    ///
+    /// `_ARRAY` is an internal mark, not something Excel could evaluate, so writing
+    /// it out would produce a workbook Excel opens with `#NAME?` in every member.
+    func testTheArrayMarkerIsNeverSerialized() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.writeArrayFormula("TRANSPOSE(B1:D1)", over: CellRange(from: "A1", to: "A3"))
+        let xml = String(decoding: try workbook.save(), as: UTF8.self)
+
+        XCTAssertFalse(xml.contains("_ARRAY"), "the marker leaked into the file")
+    }
+
+    func testTheAnchorIsWrittenWithItsSpan() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.writeArrayFormula("TRANSPOSE(B1:D1)", over: CellRange(from: "A1", to: "A3"))
+        let entries = try SwiftZIP.ZIPReader.read(from: try workbook.save())
+        let sheetXML = try XCTUnwrap(
+            entries.first { $0.path.hasSuffix("sheet1.xml") }.map {
+                String(decoding: $0.data, as: UTF8.self)
+            })
+
+        XCTAssertTrue(sheetXML.contains("t=\"array\""), "the anchor must say what it is")
+        XCTAssertTrue(sheetXML.contains("ref=\"A1:A3\""), "and name the span it fills")
+    }
+
+    /// A single-cell array formula is still an array formula.
+    func testASingleCellArrayFormulaRoundTrips() throws {
+        let sheet = try roundTripped { sheet in
+            sheet.writeArrayFormula("SUM(B1:D1)", over: CellRange(from: "A1", to: "A1"))
+        }
+        guard case .function(let name, _) =
+            try XCTUnwrap(sheet.cell(at: "A1")?.formulaAST) else {
+            return XCTFail("A1 became \(String(describing: sheet.cell(at: "A1")))")
+        }
+        XCTAssertEqual(name, "SUM")
+    }
+
+    /// An ordinary formula is unaffected — no `t="array"` appears where none belongs.
+    func testAnOrdinaryFormulaIsNotMarkedAsAnArray() throws {
+        let workbook = Workbook()
+        let sheet = workbook.addSheet(name: "Sheet1")
+        sheet.writeFormula("SUM(B1:D1)", to: "A1")
+        let xml = String(decoding: try workbook.save(), as: UTF8.self)
+
+        XCTAssertFalse(xml.contains("t=\"array\""))
+    }
+
     // MARK: - Data Tables
 
     // A What-If data table is written as a single self-closing formula element

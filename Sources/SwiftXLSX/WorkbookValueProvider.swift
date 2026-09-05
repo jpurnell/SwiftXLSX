@@ -41,6 +41,23 @@ public struct WorkbookValueProvider: CellValueProvider, @unchecked Sendable {
         return sheet.value(at: ref)
     }
 
+    /// The far corner of everything the current sheet holds.
+    ///
+    /// Answering this is what lets a whole-column reference be read at all: the
+    /// provider is the only party that knows where the data stops.
+    public func lastPopulatedCell() -> CellRef? {
+        lastPopulatedCell(inSheet: currentSheet)
+    }
+
+    /// The far corner of everything a named sheet holds.
+    ///
+    /// - Parameter sheetName: The name of the worksheet.
+    /// - Returns: The last populated cell, or `nil` when the sheet is empty or
+    ///   does not exist.
+    public func lastPopulatedCell(inSheet sheetName: String) -> CellRef? {
+        workbook.sheets.first { $0.name == sheetName }?.lastPopulatedCell
+    }
+
     /// Returns the cell values in the given range from the current sheet.
     public func values(in range: CellRange) -> [CellValue] {
         values(in: range, inSheet: currentSheet)

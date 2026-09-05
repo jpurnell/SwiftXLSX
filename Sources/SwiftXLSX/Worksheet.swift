@@ -14,11 +14,49 @@ public final class Worksheet: @unchecked Sendable {
     private(set) var validations: [(range: CellRange, type: ValidationType)] = []
     private(set) var autoFilterRange: CellRange?
     private(set) var mergedCells: [CellRange] = []
+
+    /// The array formulas on this sheet, each anchored at the top-left cell of the
+    /// span it fills.
+    ///
+    /// Sheet-level rather than part of a cell's value, alongside merged cells and
+    /// the auto-filter, because that is what it is: a statement about a rectangle.
+    /// Keeping it out of the anchor's `CellValue` leaves that formula's AST exactly
+    /// what the author wrote, which is what every reader downstream wants to see.
+    private(set) var arrayFormulas: [(anchor: CellRef, span: CellRange)] = []
     private(set) var rowHeights: [Int: Double] = [:]
     private(set) var frozenPaneRef: String?
 
+    /// The far corner of everything this sheet holds, or `nil` when it holds
+    /// nothing.
+    ///
+    /// The bounding box's bottom-right, which is not necessarily a populated cell
+    /// itself: its column may come from one cell and its row from another. That is
+    /// exactly what a clip wants — the point past which nothing can be.
+    ///
+    /// Maintained on write rather than scanned on read. A sheet can hold hundreds
+    /// of thousands of cells and this is asked once per range read during
+    /// evaluation, so scanning would make whole-column references expensive in a
+    /// different way than the one it exists to fix.
+    public private(set) var lastPopulatedCell: CellRef?
+
     init(name: String) {
         self.name = name
+    }
+
+    /// Writes one cell and keeps ``lastPopulatedCell`` true.
+    ///
+    /// Every write goes through here. The bound is only as good as the guarantee
+    /// that nothing sets `cells` behind its back.
+    ///
+    /// - Parameters:
+    ///   - ref: The cell reference, in A1 notation.
+    ///   - entry: The value and style to store.
+    private func store(_ ref: String, _ entry: (CellValue, CellStyle)) {
+        cells[ref] = entry
+        let cell = CellRef(ref)
+        lastPopulatedCell = CellRef(
+            column: Swift.max(lastPopulatedCell?.column ?? 0, cell.column),
+            row: Swift.max(lastPopulatedCell?.row ?? 0, cell.row))
     }
 
     // MARK: - Internal Mutation (Reader Support)
@@ -27,7 +65,16 @@ public final class Worksheet: @unchecked Sendable {
     ///
     /// Used by ``WorksheetParser`` when reading cells from an XLSX file.
     func setCell(_ ref: String, value: CellValue, style: CellStyle) {
-        cells[ref] = (value, style)
+        store(ref, (value, style))
+    }
+
+    /// Records an array formula's span, as read from a file.
+    ///
+    /// - Parameters:
+    ///   - anchor: The top-left cell, which carries the formula.
+    ///   - span: The rectangle the formula fills.
+    func addArrayFormula(anchor: CellRef, span: CellRange) {
+        arrayFormulas.append((anchor: anchor, span: span))
     }
 
     /// Sets the width of a column by its 1-based index.
@@ -39,17 +86,17 @@ public final class Worksheet: @unchecked Sendable {
 
     /// Writes a text value to the specified cell.
     public func write(_ value: String, to ref: String, style: CellStyle = .general) {
-        cells[ref] = (.text(value), style)
+        store(ref, (.text(value), style))
     }
 
     /// Writes a numeric value to the specified cell.
     public func write(_ value: Double, to ref: String, style: CellStyle = .general) {
-        cells[ref] = (.number(value), style)
+        store(ref, (.number(value), style))
     }
 
     /// Writes an integer value to the specified cell.
     public func write(_ value: Int, to ref: String, style: CellStyle = .general) {
-        cells[ref] = (.number(Double(value)), style)
+        store(ref, (.number(Double(value)), style))
     }
 
     /// Writes a formula string to the specified cell, parsing it into an AST.
@@ -64,9 +111,9 @@ public final class Worksheet: @unchecked Sendable {
     public func writeFormula(_ formula: String, to ref: String, style: CellStyle = .general) {
         let cleaned = formula.hasPrefix("=") ? String(formula.dropFirst()) : formula
         if let ast = try? FormulaParser.parse(cleaned) { // silent: fallback to _RAW on parse failure
-            cells[ref] = (.formula(ast, cached: nil), style)
+            store(ref, (.formula(ast, cached: nil), style))
         } else {
-            cells[ref] = (.formula(.function("_RAW", [.text(cleaned)]), cached: nil), style)
+            store(ref, (.formula(.function("_RAW", [.text(cleaned)]), cached: nil), style))
         }
     }
 
@@ -87,7 +134,7 @@ public final class Worksheet: @unchecked Sendable {
     public func write(
         _ formula: FormulaAST, to ref: String, cached: CellValue, style: CellStyle = .general
     ) {
-        cells[ref] = (.formula(formula, cached: cached), style)
+        store(ref, (.formula(formula, cached: cached), style))
     }
 
     /// Writes a formula AST to the specified cell.
@@ -97,7 +144,44 @@ public final class Worksheet: @unchecked Sendable {
     ///   - ref: The cell reference, such as `B4`.
     ///   - style: The cell style to apply.
     public func write(_ formula: FormulaAST, to ref: String, style: CellStyle = .general) {
-        cells[ref] = (.formula(formula, cached: nil), style)
+        store(ref, (.formula(formula, cached: nil), style))
+    }
+
+    /// Writes an array formula over a range of cells.
+    ///
+    /// One formula fills the whole rectangle. The top-left cell carries the text,
+    /// and every other cell in the span is marked as computed by it — which is how
+    /// Excel stores this and, more importantly, what is true: the formula evaluates
+    /// once and its result fills the span.
+    ///
+    /// ```swift
+    /// let workbook = Workbook()
+    /// let sheet = workbook.addSheet(name: "Sheet1")
+    /// sheet.writeArrayFormula("TRANSPOSE(B1:D1)", over: CellRange(from: "A1", to: "A3"))
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - formula: The formula text, without a leading `=`.
+    ///   - range: The rectangle it fills. Its top-left cell becomes the anchor.
+    ///   - style: The style for every cell in the span.
+    public func writeArrayFormula(
+        _ formula: String, over range: CellRange, style: CellStyle = .general
+    ) {
+        let anchor = range.start
+        writeFormula(formula, to: anchor.reference, style: style)
+        arrayFormulas.append((anchor: anchor, span: range))
+
+        for row in range.start.row...range.end.row {
+            for column in range.start.column...range.end.column {
+                let cell = CellRef(column: column, row: row)
+                guard cell != anchor else { continue }
+                store(cell.reference, (
+                    .formula(
+                        .function("_ARRAY", [.cellRef(anchor), .text(range.reference)]),
+                        cached: nil),
+                    style))
+            }
+        }
     }
 
     /// Returns the formula AST at the given cell reference, if any.
