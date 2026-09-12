@@ -1,0 +1,9 @@
+.build/
+.DS_Store
+.swiftpm/
+development-guidelines/
+latestReport.json
+/.claude/skills/
+/development-guidelines.pre-v2/
+.claude/settings.local.json
+project/library/

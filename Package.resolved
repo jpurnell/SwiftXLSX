@@ -1,0 +1,42 @@
+{
+  "originHash" : "6b4359003e3c02d468faa4583d15f4a9f29d12961fb02a871eb34de9b4ef8700",
+  "pins" : [
+    {
+      "identity" : "swift-docc-plugin",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-docc-plugin",
+      "state" : {
+        "revision" : "647c708be89f834fa6a6d4945442793a77ddf5b6",
+        "version" : "1.5.0"
+      }
+    },
+    {
+      "identity" : "swift-docc-symbolkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-docc-symbolkit",
+      "state" : {
+        "revision" : "b45d1f2ed151d057b54504d653e0da5552844e34",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "swiftexcelcore",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpurnell/SwiftExcelCore",
+      "state" : {
+        "revision" : "5d5e3e9ac3cc86aba79319d120f34138e754d4ba",
+        "version" : "0.8.0"
+      }
+    },
+    {
+      "identity" : "swiftzip",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpurnell/SwiftZIP.git",
+      "state" : {
+        "revision" : "a5013c96745a5f298f8e9d7f955c3f78fc74f113",
+        "version" : "0.6.0"
+      }
+    }
+  ],
+  "version" : 3
+}

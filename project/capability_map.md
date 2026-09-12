@@ -1,0 +1,83 @@
+# SwiftXLSX Capability Map
+
+**Purpose:** Scannable inventory of what this project can do — feature areas, key types, external interfaces, and application domains.
+
+**Last reviewed:** 2026-09-01 (reviewed again for 0.7.0)
+
+> **Format reference:** See `development-guidelines/rules/capability_map.md` for field definitions,
+> naming conventions, and maintenance rules.
+
+---
+
+## Workbook Authoring
+
+**Key types:** `Workbook`, `Worksheet`, `CellValue`, `CellRef`, `CellRange`, `SheetReference`
+**Interfaces:** `Workbook()`, `addSheet(name:)`, `write(_:to:)`, `save()`, `save(to:)`
+**Applications:** Generating spreadsheets from computed data, exporting reports, producing models a finance user can open and edit
+
+## Workbook Reading
+
+**Key types:** `WorkbookReader`, `WorksheetParser`, `StyleSheetParser`, `SharedStringsParser`, `WorkbookXMLParser`, `RelationshipsParser`, `ContentTypesParser`, `DefinedNameResolver`, `XLSXReadError`
+**Interfaces:** `Workbook(contentsOf:)`, `Workbook(xlsxData:)`, `Workbook.namedRanges`, `Worksheet.style(at:)`, `Worksheet.write(_:to:cached:style:)`
+**Applications:** Ingesting spreadsheets authored elsewhere, round-tripping a workbook through code, recovering a model from a file
+**Dependencies:** SwiftZIP
+
+Reads packages written by Excel as of 0.6.0. Earlier releases resolved the main document part
+by substring match and returned an empty workbook for any Excel-authored file — see the
+`ForeignWorkbookReadTests` suite, which reads packages this library did not write.
+
+Recovers shared formulas and data tables as of 0.7.0. Excel stores a repeated formula once on its
+group's master cell and a What-If table as a single element naming its span; both leave the other
+cells' `<f>` elements empty. Before 0.7.0 those cells fell through to their cached values and read
+as constants. The invariant now held and tested: **a cell carrying an `<f>` element is a formula
+cell, never a bare value.** A formula that cannot be parsed is marked `_RAW`, an unresolvable
+shared group `_SHARED`, and a data table `_DATATABLE` — visible rather than silent.
+
+Recovers named ranges as of 0.8.0. `xl/workbook.xml` was parsed for defined names from the start
+and the result discarded twice — at the parse call and again in `Workbook.init(xlsxData:)`. A
+`.namedRange` in a formula was therefore unresolvable, not merely inconvenient, and models route
+their most important single values through named ranges.
+
+Exposes cell styles as of 0.9.0. Styles were resolved on read from the start, built-in number
+formats included, and kept where no caller could reach them. A number format is frequently the
+only statement a file makes about what a value means.
+
+Writes a formula with its cached value as of 0.10.0, so a workbook built in code can be made to
+look like one read from disk — which is what a test of the reader's own shapes needs, a data
+table's body being cached numbers under a single marker.
+
+## Formula Representation
+
+**Key types:** `FormulaAST`, `FormulaLexer`, `FormulaParser`, `FormulaSerializer`, `FormulaToken`, `FormulaParseError`
+**Interfaces:** `write(_ formula: FormulaAST, to:)`, `writeFormula(_:to:)`, `formulaAST(at:)`
+**Applications:** Writing live formulas rather than baked values, reading a sheet's logic rather than its results, translating formulas between representations
+
+## Formula Evaluation
+
+**Key types:** `FormulaEvaluator`, `FunctionRegistry`, `ExcelFunction`, `CellValueProvider`, `EvalError`, `ExcelError`
+**Interfaces:** `FormulaEvaluator.evaluate(_:provider:)`, `FunctionRegistry.register(_:)`
+**Applications:** Computing results without Excel, validating that a generated sheet produces expected values, custom function extension
+
+## Built-in Function Library
+
+**Key types:** `BuiltinMathFunctions`, `BuiltinStatsFunctions`, `BuiltinFinancialFunctions`, `BuiltinLogicalFunctions`, `BuiltinTextFunctions`, `BuiltinLookupFunctions`, `BuiltinDateFunctions`, `BuiltinAggregationFunctions`
+**Interfaces:** Resolved by name through `FunctionRegistry`
+**Applications:** Evaluating the formulas real spreadsheets contain — PMT, NPV, IRR, VLOOKUP, and the common math, text, and date set
+
+## Dependency Analysis
+
+**Key types:** `DependencyGraph`, `NamedRange`, `NamedRangeCollection`, `NameResolver`
+**Interfaces:** `DependencyGraph.topologicalSort()`, cycle detection, impact analysis
+**Applications:** Determining recalculation order, finding circular references, assessing the blast radius of changing a cell
+
+Scoped as of 0.11.0. The whole-workbook graph is a *calculation-order* graph — every cell, labels
+and referenced-empty cells included, which is what an evaluator needs. A caller recovering a model
+wants a different graph over the same file: one sheet, numeric cells, references out of scope
+dropped with their edges. Both are correct; they answer different questions, so the scope is given
+before the graph is built rather than filtered afterwards.
+
+## Presentation and Layout
+
+**Key types:** `CellStyle`, `Font`, `Border`, `Alignment`, `Fill`, `NumberFormat`, `StyleSheet`, `DesignBundle`, `ValidationType`
+**Interfaces:** `write(_:to:style:)`, `mergeCells(_:)`, `freezePanes(at:)`, `setAutoFilter(_:)`, `addValidation(_:type:)`, `setColumnWidth(column:width:)`, `setRowHeight(row:height:)`
+**Applications:** Producing spreadsheets that read as designed documents rather than data dumps; constraining user input through validation

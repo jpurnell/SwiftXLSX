@@ -1,0 +1,22 @@
+# `disk-clean` used to be listed under `exclude:` here. It is no longer a checker
+# at all — it moved to the `quality-gate clean` subcommand because it mutates the
+# tree — so the exclusion referred to nothing and was dropped rather than renamed.
+enabledCheckers:
+  - all
+  - logging
+
+consistency:
+  corpusPath: ${ORG_JUDGEMENT_CORPUS:-}   # set in the environment; no absolute path in the repo
+  projectID: SwiftXLSX
+  consistencyThreshold: 0.7
+  defaultRiskTier: 2
+
+# v2 layout: the master plan is project-owned, not framework content.
+status:
+  guidelinesPath: "."
+  masterPlanPath: project/master_plan.md
+
+# Refuse to trust a gate binary older than this. A stale binary silently runs
+# old rules; without this pin nothing says so. Ratchet on each deploy that the
+# repo depends on. Warns on every run; fails only under --strict.
+minimumGateVersion: "2026-08-26"
