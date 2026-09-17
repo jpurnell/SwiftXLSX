@@ -4,10 +4,20 @@ import SwiftExcelCore
 /// Turns a `definedName` element into a ``NamedRange``.
 ///
 /// The file states a name's target as a formula string — `'ANSWER KEY'!$M$1`,
-/// `Sheet1!$A$1:$D$10`, or an expression that is not a reference at all. Excel
-/// permits any formula, so the shapes worth recognizing are recognized and the
-/// rest is kept verbatim rather than discarded: a name whose target this cannot
-/// parse is still a name, and a caller can look at what the file said.
+/// `Sheet1!$A$1:$D$10`, `Expenditures!$D:$D`, or an expression that is not a
+/// reference at all. Excel permits any formula, so the shapes worth recognizing
+/// are recognized and the rest is kept verbatim as ``NamedRangeTarget/unparsed(_:)``.
+///
+/// ## Why `.unparsed` rather than `.formula(.text(…))`
+///
+/// The old fallback claimed a name it could not read **was a text constant**, which
+/// is a different name. Written back out it gains quotes — a range becomes a caption
+/// and a number becomes a string — and evaluated, it hands a formula a caption where
+/// a range was meant. `SUMIFS(amounts, …)` answered zero across 1,058 cells in one
+/// corpus workbook for exactly that reason.
+///
+/// `.unparsed` says the true thing instead, and is the one target whose round trip is
+/// exact by construction: reproducing it is the identity function.
 enum DefinedNameResolver {
 
     /// Builds a named range from a parsed `definedName`.
@@ -29,18 +39,19 @@ enum DefinedNameResolver {
         }
 
         let formula = info.formula.trimmingCharacters(in: .whitespacesAndNewlines)
-        return NamedRange(name: name, reference: target(of: formula), scope: scope)
+        return NamedRange(name: name, reference: target(of: formula), scope: scope,
+                          isHidden: info.isHidden, attributes: info.attributes)
     }
 
     /// The target a name's formula string denotes.
     private static func target(of formula: String) -> NamedRangeTarget {
         guard let separator = formula.lastIndex(of: "!") else {
-            return local(formula) ?? .formula(.text(formula))
+            return local(formula) ?? .unparsed(formula)
         }
 
         let sheet = unquoted(String(formula[formula.startIndex..<separator]))
         let body = String(formula[formula.index(after: separator)...])
-        guard !sheet.isEmpty else { return .formula(.text(formula)) }
+        guard !sheet.isEmpty else { return .unparsed(formula) }
 
         switch local(body) {
         case .cell(let ref):
@@ -48,13 +59,18 @@ enum DefinedNameResolver {
         case .range(let range):
             return .sheetRange(SheetReference(sheet: sheet, range: range))
         default:
-            return .formula(.text(formula))
+            return .unparsed(formula)
         }
     }
 
     /// A sheet-less reference, as a cell or a range.
+    ///
+    /// Handles the whole-column and whole-row forms as well as `A1`-style ones —
+    /// `$D:$D` and `$3:$3` are references, and reading them as anything else is what
+    /// made `amounts = Expenditures!$D:$D` evaluate to its own text.
     private static func local(_ body: String) -> NamedRangeTarget? {
         let parts = body.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+        if parts.count == 2, let span = wholeSpan(parts[0], parts[1]) { return span }
         guard parts.allSatisfy({ isReference($0) }) else { return nil }
 
         if parts.count == 2 {
@@ -62,6 +78,57 @@ enum DefinedNameResolver {
         }
         guard parts.count == 1 else { return nil }
         return .cell(CellRef(String(parts[0])))
+    }
+
+    /// A whole column or a whole row, as the range it names.
+    ///
+    /// `$D:$D` is every cell of column D and `$3:$3` is every cell of row 3. Excel writes
+    /// both, and both were unreadable here because ``isReference(_:)`` requires a letter
+    /// *and* a digit in each half — `$D` has no digit and `$3` has no letter.
+    ///
+    /// The absolute markers are carried through, so the range remembers it was written
+    /// `$D:$D` rather than `D:D` and a writer can put back what it read.
+    ///
+    /// - Parameters:
+    ///   - start: The half before the colon.
+    ///   - end: The half after it.
+    /// - Returns: The range, or `nil` when the pair is not a whole span.
+    private static func wholeSpan(_ start: Substring, _ end: Substring) -> NamedRangeTarget? {
+        if let first = columnNumber(start), let last = columnNumber(end) {
+            return .range(CellRange(
+                from: CellRef(column: first, row: 1,
+                              absoluteColumn: start.hasPrefix("$"), absoluteRow: false),
+                to: CellRef(column: last, row: CellRef.lastOnSheet.row,
+                            absoluteColumn: end.hasPrefix("$"), absoluteRow: false)))
+        }
+        if let first = rowNumber(start), let last = rowNumber(end) {
+            return .range(CellRange(
+                from: CellRef(column: 1, row: first,
+                              absoluteColumn: false, absoluteRow: start.hasPrefix("$")),
+                to: CellRef(column: CellRef.lastOnSheet.column, row: last,
+                            absoluteColumn: false, absoluteRow: end.hasPrefix("$"))))
+        }
+        return nil
+    }
+
+    /// A fragment that is nothing but a column, as its number.
+    private static func columnNumber(_ fragment: Substring) -> Int? {
+        let letters = fragment.drop { $0 == "$" }
+        guard !letters.isEmpty, letters.allSatisfy({ $0.isLetter }) else { return nil }
+        var number = 0
+        for letter in letters.uppercased().unicodeScalars {
+            guard let value = letter.value as UInt32?, value >= 65, value <= 90 else { return nil }
+            number = number * 26 + Int(value - 64)
+        }
+        return number <= CellRef.lastOnSheet.column ? number : nil
+    }
+
+    /// A fragment that is nothing but a row, as its number.
+    private static func rowNumber(_ fragment: Substring) -> Int? {
+        let digits = fragment.drop { $0 == "$" }
+        guard !digits.isEmpty, digits.allSatisfy({ $0.isNumber }), let number = Int(digits)
+        else { return nil }
+        return (1...CellRef.lastOnSheet.row).contains(number) ? number : nil
     }
 
     /// Whether a fragment is an `A1`-style reference and nothing else.

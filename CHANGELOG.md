@@ -7,6 +7,81 @@
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-17
+
+### Fixed
+
+- **A workbook keeps its defined names.** The reader parsed every `<definedName>`; the writer
+  emitted none. A file read by this package and written back came out with an **empty Name
+  Manager**, and nothing said so — the file opened, and the loss was discovered later with
+  nothing to connect it to us.
+
+  Measured across 2,240 workbooks: **1,022 define names, 161,901 names in all**, median 10 per
+  workbook. The largest single model carries **47,106** — a sell-side equity model, which is
+  to say exactly the sort of file whose author would notice.
+
+- **A whole-column or whole-row name is a reference again.** `isReference` required a letter
+  *and* a digit in each half, so `$D` failed and `amounts = Expenditures!$D:$D` was read as
+  something that is not a range at all. The evaluator then summed its text:
+  `SUMIFS(amounts, …)` answered **zero across 1,058 cells** in one corpus workbook. Both forms
+  now read as the ranges they are, absolute markers and all.
+
+### Added
+
+- **`Workbook.define(_:as:scope:hidden:attributes:)`** — a public way to add a name.
+
+  Its refers-to text is *derived from the target* when the file is written, rather than
+  supplied beside it, so there is nothing to keep in step. A caller needing a form this
+  package does not parse passes `.unparsed("…")` and says so in the type.
+
+- **`NamedRange.isHidden` and `.attributes` are read and written.** **74,992 of the corpus's
+  161,901 names — 46% — are hidden**: filter ranges, print views, the `.wvu.` scaffolding
+  Excel writes for custom views. A round trip that kept the target and dropped the flag would
+  surface half of every Name Manager; on the 47,106-name model, twenty thousand names
+  appearing where none were visible.
+
+### Changed
+
+- **A name the reader cannot parse is `.unparsed`, not `.formula(.text(…))`.** Requires
+  SwiftExcelCore 0.10.0.
+
+  The old fallback kept the characters and claimed the name **was a text constant** — a claim
+  that gets acted on. Written back it gains quotes, so `Expenditures!$D:$D` becomes the string
+  `"Expenditures!$D:$D"` and `42` becomes `"42"`.
+
+  This is what makes reconstructing a name's text from its target safe rather than ambitious.
+  `.unparsed` round-trips by the identity function, so **byte-exactness is available for every
+  name from the start**, and each shape the reader parses is an opt-in promise with a test
+  behind it. One test asserted the old behaviour and is reversed, keeping the reasoning that
+  survived: *keeping what the file said beats discarding the name or inventing a cell for it.*
+
+- **The writer's rules, each chosen so no second copy of anything is needed:** a full span is
+  written `$D:$D` rather than `D1:D1048576`, because the expansion is visible in the Name
+  Manager; a sheet name is quoted only where Excel quotes it; `CellRef` already carries its
+  own `$` markers. Output is stable — a workbook written twice is the same bytes.
+
+## [0.25.0] - 2026-09-12
+
+### Changed
+
+- **This repository's history was replaced.** The code is unchanged; what was removed is
+  history, not source.
+
+  The previous history contained material belonging to an unrelated project, added by a
+  scaffolding refactor on 2026-08-04 and deleted from the working tree on 2026-09-04. Deleting
+  a file does not remove it from git history, and this repository has been public throughout,
+  so the material remained retrievable from every commit and every release tag that contained
+  it. A force-push would have left the objects fetchable by direct SHA until GitHub expired
+  them; the repository was deleted and recreated instead, which destroys the object store
+  outright.
+
+  **Tags v0.6.0 through v0.24.1 no longer exist.** This release is 0.25.0, deliberately above
+  all of them, so that no version number points at two different commits — which would
+  otherwise break SwiftPM's trust-on-first-use fingerprints for anyone who had resolved an
+  older version. If a resolve fails with *"does not match previously recorded value"*, delete
+  the package's resolved state and resolve again.
+
+
 ## [0.24.1] - 2026-09-10
 
 ### Fixed

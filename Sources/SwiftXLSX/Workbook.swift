@@ -63,6 +63,34 @@ public final class Workbook: @unchecked Sendable {
         namedRanges.add(range)
     }
 
+    /// Defines a name in this workbook.
+    ///
+    /// The refers-to text is derived from the target when the file is written, so there is
+    /// nothing to keep in step — see `DefinedNameWriter`. A caller needing a form this
+    /// package does not parse passes ``NamedRangeTarget/unparsed(_:)`` and says so in the
+    /// type, rather than handing the writer a string that shadows a target.
+    ///
+    /// ```swift
+    /// let workbook = Workbook()
+    /// workbook.addSheet(name: "Definitions")
+    /// workbook.define("taxRate",
+    ///                 as: .sheetCell(SheetReference(sheet: "Definitions", cell: CellRef("$C$8"))))
+    /// workbook.define("normal", as: .unparsed("_xlfn.LAMBDA(_xlpm.x,_xlpm.x+1)"))
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - name: The name, as Excel will show it.
+    ///   - target: What the name points at.
+    ///   - scope: Workbook-wide, or one sheet.
+    ///   - hidden: Whether Excel hides it from the Name Manager.
+    ///   - attributes: Attributes this package does not interpret.
+    public func define(_ name: String, as target: NamedRangeTarget,
+                       scope: NameScope = .workbook, hidden: Bool = false,
+                       attributes: [String: String] = [:]) {
+        namedRanges.add(NamedRange(name: name, reference: target, scope: scope,
+                                   isHidden: hidden, attributes: attributes))
+    }
+
     /// Adds a new worksheet and returns it.
     @discardableResult
     public func addSheet(name: String) -> Worksheet {
@@ -141,7 +169,11 @@ public final class Workbook: @unchecked Sendable {
         for (i, sheet) in sheets.enumerated() {
             xml += "<sheet name=\"\(escapeXML(sheet.name))\" sheetId=\"\(i + 1)\" r:id=\"rId\(i + 1)\"/>"
         }
-        xml += "</sheets></workbook>"
+        xml += "</sheets>"
+        // After `<sheets>` and before anything else: the schema fixes the order, and Excel
+        // repairs a file that gets it wrong by deleting what it could not place.
+        xml += DefinedNameWriter.element(for: namedRanges.all, sheets: sheets)
+        xml += "</workbook>"
         return xml
     }
 

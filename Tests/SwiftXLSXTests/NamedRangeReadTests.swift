@@ -99,15 +99,29 @@ final class NamedRangeReadTests: XCTestCase {
                     range: CellRange(from: CellRef("$A$1"), to: CellRef("$U$64")))))
     }
 
+    /// A target that is not a reference is kept verbatim — and now *says* it is verbatim.
+    ///
+    /// **The instinct was right and the representation was wrong.** This asserted
+    /// `.formula(.text("0.05*2"))`, which keeps the characters but claims the name **is a
+    /// text constant** — and that claim is acted on. Written back out it gains quotes, so a
+    /// range becomes a caption and a number becomes a string; evaluated, it hands a formula
+    /// text where a range was meant. `SUMIFS(amounts, …)` answered zero across 1,058 cells in
+    /// one corpus workbook for exactly that reason.
+    ///
+    /// `.unparsed` keeps the same characters and says the true thing about them, which makes
+    /// it the one target whose round trip is exact by construction.
+    ///
+    /// Reversed rather than deleted, because the reasoning it carried — *keeping what the
+    /// file said beats discarding the name or inventing a cell for it* — is the reasoning
+    /// that survived.
     func testANameWhoseTargetIsNotAReferenceIsKeptVerbatim() throws {
         let book = try workbook(
             definedNames: "<definedNames><definedName name=\"Rate\">"
                 + "0.05*2</definedName></definedNames>")
 
         XCTAssertEqual(
-            book.namedRanges.resolve("Rate"), .formula(.text("0.05*2")),
-            "Excel permits any formula here. Keeping what the file said beats "
-                + "discarding the name or inventing a cell for it"
+            book.namedRanges.resolve("Rate"), .unparsed("0.05*2"),
+            "kept verbatim, and labelled as unread rather than as a text constant"
         )
     }
 
