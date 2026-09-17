@@ -28,8 +28,10 @@ public enum FormulaSerializer {
             return 5
         case .negate:
             return 6
-        case .function, .cellRef, .cellRange, .sheetRef, .namedRange,
+        case .function, .call, .cellRef, .cellRange, .sheetRef, .namedRange,
              .number, .text, .bool, .error:
+            // A call binds tightest, like any other primary. `f(1)*2` needs no brackets
+            // around the call and must not acquire any, or the round trip stops being one.
             return 7
         }
     }
@@ -94,6 +96,16 @@ public enum FormulaSerializer {
         case .function(let name, let args):
             let argStrings = args.map { serializeNode($0, depth: depth + 1) }
             return "\(name)(\(argStrings.joined(separator: ",")))"
+
+        case .call(let callee, let args):
+            let argStrings = args.map { serializeNode($0, depth: depth + 1) }
+            let calledText = serializeNode(callee, depth: depth + 1)
+            // A callee that binds looser than a call needs its brackets back, or
+            // `(a+b)(1)` would be written `a+b(1)` and read as something else entirely.
+            // A `LAMBDA(…)` is a primary and needs none, which is the common case.
+            let called = precedence(of: callee) < precedence(of: ast)
+                ? "(\(calledText))" : calledText
+            return "\(called)(\(argStrings.joined(separator: ",")))"
         }
     }
 

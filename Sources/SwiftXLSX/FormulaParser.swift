@@ -202,7 +202,7 @@ private struct TokenParser {
             throw FormulaParseError(kind: .emptyFormula, offset: 0, formula: formula)
         }
 
-        var left = try parsePrefix()
+        var left = try parseCalls(on: try parsePrefix())
 
         while let prec = infixPrecedence(of: currentToken), prec >= minPrecedence {
             let operatorToken = advance()
@@ -212,6 +212,44 @@ private struct TokenParser {
         }
 
         return left
+    }
+
+    // MARK: - Postfix Calls
+
+    /// Applies any `(…)` that follows an expression, as many times as there are.
+    ///
+    /// `LAMBDA(x,x+1)(5)` — the immediately-invoked form, where what is called is written in
+    /// place and has no name. The grammar required a call to begin with an identifier, so this
+    /// reported `unexpectedToken(expected: "end of expression", found: "(")`.
+    ///
+    /// **A loop rather than one step, because calls chain.** `add(3)(4)` calls the lambda that
+    /// `add(3)` returned, which is how currying is written and has no name between the two.
+    ///
+    /// An ordinary `SUM(1,2)` never reaches here: `parseIdentifier` has already consumed its
+    /// brackets and produced a ``FormulaAST/function(_:_:)``. That distinction is deliberate —
+    /// the registry looks names up and the serializer writes them, and turning every call into
+    /// a call on a name would be a tidier grammar and a broken package.
+    ///
+    /// - Parameter callee: the expression just parsed.
+    /// - Returns: it, wrapped in as many calls as follow.
+    private mutating func parseCalls(on callee: FormulaAST) throws -> FormulaAST {
+        var result = callee
+        // Bounded by the input: each pass consumes a `(` and its matching `)`, and a formula
+        // holds finitely many.
+        while currentToken == .leftParen {
+            advance()
+            var arguments: [FormulaAST] = []
+            if currentToken != .rightParen {
+                arguments.append(try parseArgument())
+                while currentToken == .comma {
+                    advance()
+                    arguments.append(try parseArgument())
+                }
+            }
+            try expect(.rightParen)
+            result = .call(result, arguments)
+        }
+        return result
     }
 
     // MARK: - Prefix Parsing

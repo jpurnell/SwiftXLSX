@@ -96,6 +96,12 @@ enum SharedFormula {
 
         case .function(let name, let args):
             return .function(name, args.map { each($0, rowDelta, columnDelta) })
+        case .call(let callee, let args):
+            // The callee shifts too. A lambda's body can hold relative references, and a
+            // shared formula that moved the arguments but not the body would be a formula
+            // reading one row and computing on another.
+            return .call(each(callee, rowDelta, columnDelta),
+                         args.map { each($0, rowDelta, columnDelta) })
         }
     }
 

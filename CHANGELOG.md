@@ -7,6 +7,32 @@
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-17
+
+### Added
+
+- **`LAMBDA(…)(args)` parses.** The immediately-invoked form, where what is called is written
+  in place and has no name. The grammar required a call to begin with an identifier, so this
+  reported `unexpectedToken(expected: "end of expression", found: "(")` — the last of the three
+  `LAMBDA` shapes in the corpus and the only one the parser could not read.
+
+  It matters more than its rarity suggests: a `LAMBDA` cannot call itself by name without a
+  defined name, and adding one is a manual step. Two conformance rounds were lost to a
+  `depthProbe` nobody had added, each reporting *first refused: 1* for a limit that cannot
+  refuse at depth 1. Self-application is how a recursive lambda is written with nothing added
+  to the file, and it is what finally measured Excel's 4,096.
+
+  Postfix and looping, because calls chain: `add(3)(4)` is how currying is written, with no
+  name between the two calls. An ordinary `SUM(1,2)` is untouched and still parses to
+  `.function` — the registry looks names up and the serializer writes them.
+
+### Changed
+
+- **SwiftExcelCore 0.12.0** for `FormulaAST.call`. `SharedFormula` shifts the callee as well as
+  the arguments: a lambda's body can hold relative references, and shifting one without the
+  other would be a formula reading one row and computing on another.
+
+
 ## [0.27.0] - 2026-09-17
 
 ### Changed
