@@ -227,9 +227,7 @@ public final class Workbook: @unchecked Sendable {
         for row in rowGroups.keys.sorted() {
             var rowAttrs = "r=\"\(row)\""
             if let height = sheet.rowHeights[row] {
-                let formatted = height.truncatingRemainder(dividingBy: 1) == 0
-                    ? String(Int(height)) : String(height)
-                rowAttrs += " ht=\"\(formatted)\" customHeight=\"1\""
+                rowAttrs += " ht=\"\(NumberText.of(height))\" customHeight=\"1\""
             }
             xml += "<row \(rowAttrs)>"
             guard let cellsInRow = rowGroups[row] else { continue }
@@ -240,10 +238,7 @@ public final class Workbook: @unchecked Sendable {
                     let idx = sharedStrings.index(for: s)
                     xml += "<c r=\"\(ref)\" t=\"s\" s=\"\(styleId)\"><v>\(idx)</v></c>"
                 case .number(let n):
-                    let formatted = n.truncatingRemainder(dividingBy: 1) == 0
-                        ? String(Int(n))
-                        : String(n)
-                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><v>\(formatted)</v></c>"
+                    xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><v>\(NumberText.of(n))</v></c>"
                 case .bool(let b):
                     xml += "<c r=\"\(ref)\" t=\"b\" s=\"\(styleId)\"><v>\(b ? 1 : 0)</v></c>"
                 case .formula(let ast, let cached):
@@ -327,9 +322,7 @@ public final class Workbook: @unchecked Sendable {
         guard let cached else { return ("", "") }
         switch cached {
         case .number(let number):
-            let formatted = number.truncatingRemainder(dividingBy: 1) == 0
-                ? String(Int(number)) : String(number)
-            return ("", "<v>\(formatted)</v>")
+            return ("", "<v>\(NumberText.of(number))</v>")
         case .text(let text):
             return (" t=\"str\"", "<v>\(escapeXML(text))</v>")
         case .bool(let flag):
@@ -355,8 +348,8 @@ public final class Workbook: @unchecked Sendable {
             let joined = items.joined(separator: ",")
             return "<dataValidation type=\"list\" sqref=\"\(sqref)\" allowBlank=\"1\"><formula1>\"\(escapeXML(joined))\"</formula1></dataValidation>"
         case .decimal(let min, let max):
-            let minStr = min.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(min)) : String(min)
-            let maxStr = max.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(max)) : String(max)
+            let minStr = NumberText.of(min)
+            let maxStr = NumberText.of(max)
             return "<dataValidation type=\"decimal\" operator=\"between\" sqref=\"\(sqref)\" allowBlank=\"1\"><formula1>\(minStr)</formula1><formula2>\(maxStr)</formula2></dataValidation>"
         case .integer(let min, let max):
             return "<dataValidation type=\"whole\" operator=\"between\" sqref=\"\(sqref)\" allowBlank=\"1\"><formula1>\(min)</formula1><formula2>\(max)</formula2></dataValidation>"

@@ -183,12 +183,7 @@ public final class StyleSheet: @unchecked Sendable {
         return numberFormats[format.formatString] ?? 0
     }
 
-    private func formatSize(_ size: Double) -> String {
-        if size.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(Int(size))
-        }
-        return String(size)
-    }
+    private func formatSize(_ size: Double) -> String { NumberText.of(size) }
 
     private func escapeXML(_ string: String) -> String {
         string

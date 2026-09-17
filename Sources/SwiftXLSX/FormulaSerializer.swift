@@ -144,12 +144,5 @@ public enum FormulaSerializer {
         return "-\(serialized)"
     }
 
-    private static func formatNumber(_ n: Double) -> String {
-        if n == n.rounded(.towardZero) && !n.isNaN && !n.isInfinite {
-            if n.truncatingRemainder(dividingBy: 1) == 0 {
-                return String(Int(n))
-            }
-        }
-        return String(n)
-    }
+    private static func formatNumber(_ n: Double) -> String { NumberText.of(n) }
 }

@@ -7,6 +7,32 @@
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-09-17
+
+### Fixed
+
+- **A large number no longer takes the process down.** The writer spelled a whole number `3`
+  rather than `3.0` by asking
+  `n.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(n)) : String(n)`. The test for
+  whole-ness is right and the conversion under it is not: **every** Double past `Int.max` is
+  integer-valued, because at that magnitude the format has no fractional bits left — so the
+  guard admits precisely the numbers `Int` cannot represent, and traps on them.
+
+  This was not a throw a caller could catch and report. It was `SIGTRAP`, and it killed the
+  process from inside `worksheetXML(sheet:)`. A corpus round trip found it at a workbook
+  holding a value near 1e19, 55 files into 2,240.
+
+  The expression stood at five call sites across `Workbook`, `FormulaSerializer` and
+  `StyleSheet` — cell values, cached formula results, row heights, validation bounds, font
+  sizes and formula literals. All five now go through `NumberText.of(_:)`, which asks
+  `Int(exactly:)` rather than testing the range itself. That distinction earned its place: the
+  first repair here checked `number <= Double(Int.max)` and had the same defect one layer up,
+  since `Double(Int.max)` is not `Int.max` but the next representable value *above* it.
+
+  Infinity and NaN are clamped rather than written as `inf` and `nan`, which are not valid
+  `xsd:double` and which Excel reports as a damaged file.
+
+
 ## [0.26.0] - 2026-09-17
 
 ### Fixed
