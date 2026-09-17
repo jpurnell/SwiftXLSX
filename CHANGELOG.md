@@ -7,6 +7,20 @@
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-09-17
+
+### Changed
+
+- **SwiftExcelCore 0.11.0**, which adds `CellValue.lambda` and `ExcelError.calc`. The writer
+  handles both: a lambda in a cell is written as the formula cell it really is —
+  `<f>_xlfn.LAMBDA(…)</f><v>#CALC!</v>`, the rule in the formula and the error saying a
+  function is not a value — and a cached lambda result caches `#CALC!`.
+
+  The captured frame is deliberately dropped on the way out. It is a fact about the evaluation
+  that produced the value, the file format has nowhere to put it, and a lambda read back from
+  a file closes over the workbook, which is where it started.
+
+
 ## [0.26.2] - 2026-09-17
 
 ### Fixed

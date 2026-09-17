@@ -241,6 +241,20 @@ public final class Workbook: @unchecked Sendable {
                     xml += "<c r=\"\(ref)\" s=\"\(styleId)\"><v>\(NumberText.of(n))</v></c>"
                 case .bool(let b):
                     xml += "<c r=\"\(ref)\" t=\"b\" s=\"\(styleId)\"><v>\(b ? 1 : 0)</v></c>"
+                case .lambda(let parameters, let body, _):
+                    // A lambda in a cell is a formula cell, whatever the value says. Excel
+                    // writes `<f>_xlfn.LAMBDA(…)</f><v>#CALC!</v>` — the rule in the formula,
+                    // and the error that a function is not a value in the cached result.
+                    //
+                    // The captured frame is deliberately dropped. It is a fact about the
+                    // evaluation that produced this value and the file format has nowhere to
+                    // put it; a lambda read back from the file closes over the workbook, which
+                    // is where it started.
+                    let text = FormulaSerializer.serialize(
+                        .function("_xlfn.LAMBDA", parameters.map { .namedRange($0) } + [body]))
+                    xml += "<c r=\"\(ref)\" t=\"e\" s=\"\(styleId)\">"
+                        + "<f>\(escapeXML(text))</f>"
+                        + "<v>\(escapeXML(ExcelError.calc.rawValue))</v></c>"
                 case .formula(let ast, let cached):
                     // A member of an array formula's span. Excel stores the formula
                     // once, at the anchor, and leaves every other cell an empty
@@ -333,6 +347,10 @@ public final class Workbook: @unchecked Sendable {
             // formula with no result — which is how a mis-sized array formula lost
             // the only evidence that it was mis-sized.
             return (" t=\"e\"", "<v>\(escapeXML(excelError.rawValue))</v>")
+        case .lambda:
+            // A function is not a value, which is what `#CALC!` says. Excel caches exactly
+            // this for a formula that produced a lambda nobody called.
+            return (" t=\"e\"", "<v>\(escapeXML(ExcelError.calc.rawValue))</v>")
         case .blank, .date, .formula, .array:
             // Blank is the absence of a cached value; a date is already a number by
             // the time Excel records one; a nested formula or array is not
