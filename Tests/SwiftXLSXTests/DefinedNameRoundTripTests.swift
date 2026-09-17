@@ -122,6 +122,49 @@ final class DefinedNameRoundTripTests: XCTestCase {
         XCTAssertEqual(DefinedNameWriter.refersTo(ordinary), "$B$2:$C$9")
     }
 
+    /// A span covering the whole sheet is two short forms at once, and the `$`s say which.
+    ///
+    /// `[1]AVP!$1:$1048576` is every row, and every row is also every column, so both branches
+    /// of the short-form rule match it and the first one written won. It wrote `A:XFD` —
+    /// the same cells, a different form, and the absolute markers gone.
+    ///
+    /// Found by the corpus round trip: 54 names across three versions of one operating model,
+    /// the only names in 158,132 that came back changed. They are `_bdm.<guid>.edm` entries,
+    /// which Excel writes for external-workbook links and which no user typed — so the loss
+    /// would have been silent twice over.
+    ///
+    /// Which form the file used is not recoverable from the cells, because the two forms
+    /// select the same ones. It is recoverable from the markers: `$1:$1048576` has absolute
+    /// rows and relative columns, and `$A:$XFD` is the other way round. So the ambiguity is
+    /// resolved by the half that carries a `$`, which is evidence rather than preference.
+    func testAWholeSheetSpanKeepsTheFormItWasWrittenIn() {
+        let everyRow = NamedRangeTarget.range(CellRange(
+            from: CellRef(column: 1, row: 1, absoluteColumn: false, absoluteRow: true),
+            to: CellRef(column: CellRef.lastOnSheet.column, row: CellRef.lastOnSheet.row,
+                        absoluteColumn: false, absoluteRow: true)))
+        XCTAssertEqual(DefinedNameWriter.refersTo(everyRow), "$1:$1048576")
+
+        let everyColumn = NamedRangeTarget.range(CellRange(
+            from: CellRef(column: 1, row: 1, absoluteColumn: true, absoluteRow: false),
+            to: CellRef(column: CellRef.lastOnSheet.column, row: CellRef.lastOnSheet.row,
+                        absoluteColumn: true, absoluteRow: false)))
+        XCTAssertEqual(DefinedNameWriter.refersTo(everyColumn), "$A:$XFD")
+    }
+
+    /// The name that found it, read and written as the file has it.
+    func testTheExternalLinkNameFromTheCorpusRoundTrips() throws {
+        for formula in ["[1]AVP!$1:$1048576",
+                        "'[2]LBO Sources and Uses'!$1:$1048576"] {
+            guard let name = DefinedNameResolver.namedRange(
+                from: DefinedNameInfo(name: "_bdm.x.edm", formula: formula, localSheetId: nil,
+                                      isHidden: true, attributes: [:]),
+                sheets: []) else {
+                return XCTFail("did not read \(formula)")
+            }
+            XCTAssertEqual(DefinedNameWriter.refersTo(name.reference), formula)
+        }
+    }
+
     // MARK: - Through a file
 
     /// The whole path: define, save, read back.

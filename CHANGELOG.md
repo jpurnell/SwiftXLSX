@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+## [0.26.2] - 2026-09-17
+
+### Fixed
+
+- **A whole-sheet span kept the form it was written in.** `[1]AVP!$1:$1048576` is every row,
+  and every row is also every column, so both branches of the short-form rule matched it and
+  the column branch won by being written first. It came back `A:XFD` — the same cells, a
+  different form, and the `$`s gone.
+
+  Which form the file used is not recoverable from the cells, since the two forms select the
+  same ones. It is recoverable from the markers: `$1:$1048576` has absolute rows and relative
+  columns, `$A:$XFD` the reverse. The half carrying a `$` now chooses.
+
+- **An external-workbook reference is no longer quoted when Excel leaves it bare.** Excel
+  writes `[1]AVP!…` unquoted and `'[2]LBO Sources and Uses'!…` quoted, with the brackets
+  *inside* the quotes — so the quoting test belongs to the name past the `[n]` prefix, not to
+  the whole string. Testing the whole string quoted every external reference, because `[` is
+  neither a letter nor a digit.
+
+  Both were found by a round trip over 2,240 workbooks: of **158,132 defined names, these 54
+  were the only ones that did not come back identical**, all of them `_bdm.<guid>.edm`
+  external-link entries across three versions of one operating model. No user typed those
+  names and no user would have seen them change.
+
+
 ## [0.26.1] - 2026-09-17
 
 ### Fixed

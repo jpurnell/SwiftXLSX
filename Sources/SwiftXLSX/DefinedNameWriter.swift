@@ -87,14 +87,36 @@ enum DefinedNameWriter {
     /// covering every row of its columns *is* a column reference.
     private static func span(_ range: CellRange) -> String {
         let start = range.start, end = range.end
-        if start.row == 1, end.row == CellRef.lastOnSheet.row {
-            return "\(marker(start.absoluteColumn))\(columnLetters(start.column))"
-                + ":\(marker(end.absoluteColumn))\(columnLetters(end.column))"
+        let everyRow = start.row == 1 && end.row == CellRef.lastOnSheet.row
+        let everyColumn = start.column == 1 && end.column == CellRef.lastOnSheet.column
+
+        guard everyRow, everyColumn else {
+            if everyRow { return columnForm(start, end) }
+            if everyColumn { return rowForm(start, end) }
+            return "\(start.reference):\(end.reference)"
         }
-        if start.column == 1, end.column == CellRef.lastOnSheet.column {
-            return "\(marker(start.absoluteRow))\(start.row):\(marker(end.absoluteRow))\(end.row)"
-        }
-        return "\(start.reference):\(end.reference)"
+        // The whole sheet, which is every column and every row at once — so both short forms
+        // select exactly these cells and the range alone cannot say which the file used.
+        //
+        // The markers can. `$1:$1048576` has absolute rows and relative columns; `$A:$XFD` is
+        // the other way round, and a reader that keeps the `$`s has kept the evidence. So the
+        // half carrying a `$` chooses the form, and the column form only wins by default when
+        // neither does.
+        //
+        // Before this the column branch simply came first and won every time, which turned 54
+        // `_bdm.<guid>.edm` external-link names in one corpus model into `A:XFD`. They were the
+        // only names in 158,132 that did not come back identical.
+        if start.absoluteRow && !start.absoluteColumn { return rowForm(start, end) }
+        return columnForm(start, end)
+    }
+
+    private static func columnForm(_ start: CellRef, _ end: CellRef) -> String {
+        "\(marker(start.absoluteColumn))\(columnLetters(start.column))"
+            + ":\(marker(end.absoluteColumn))\(columnLetters(end.column))"
+    }
+
+    private static func rowForm(_ start: CellRef, _ end: CellRef) -> String {
+        "\(marker(start.absoluteRow))\(start.row):\(marker(end.absoluteRow))\(end.row)"
     }
 
     private static func marker(_ absolute: Bool) -> String { absolute ? "$" : "" }
@@ -129,9 +151,32 @@ enum DefinedNameWriter {
     /// - Parameter sheet: The sheet's name.
     /// - Returns: `true` when the name must be quoted.
     static func needsQuoting(_ sheet: String) -> Bool {
-        guard let first = sheet.first else { return true }
+        let name = withoutExternalPrefix(sheet)
+        guard let first = name.first else { return true }
         if first.isNumber { return true }
-        return !sheet.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+        return !name.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+    }
+
+    /// A sheet name with its external-workbook prefix removed, for the quoting test only.
+    ///
+    /// A name in another workbook is written `[1]AVP!$1:$1048576`, where `[1]` indexes the
+    /// external-link table. Excel leaves that bare and quotes only when the name *after* the
+    /// prefix would need it — `'[2]LBO Sources and Uses'!…`, where the brackets sit inside the
+    /// quotes rather than outside them.
+    ///
+    /// Testing the whole string instead quotes every external reference, because `[` is
+    /// neither a letter nor a digit. The corpus round trip caught it beside the whole-sheet
+    /// span, in the same three workbooks: the file said `[1]AVP!`, and this writer said
+    /// `'[1]AVP'!`.
+    ///
+    /// - Parameter sheet: The sheet name as read.
+    /// - Returns: The name past any `[n]` prefix.
+    private static func withoutExternalPrefix(_ sheet: String) -> String {
+        guard sheet.hasPrefix("["), let close = sheet.firstIndex(of: "]") else { return sheet }
+        let index = sheet.index(after: sheet.startIndex)
+        let digits = sheet[index..<close]
+        guard !digits.isEmpty, digits.allSatisfy(\.isNumber) else { return sheet }
+        return String(sheet[sheet.index(after: close)...])
     }
 
     /// XML's five, so a name carrying an ampersand does not break the file.
