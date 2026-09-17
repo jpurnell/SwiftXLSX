@@ -7,3 +7,7 @@ latestReport.json
 /development-guidelines.pre-v2/
 .claude/settings.local.json
 project/library/
+
+# A quality-gate run with ORG_JUDGEMENT_CORPUS unset writes its telemetry to the
+# unexpanded variable, as a directory with that literal name.
+${ORG_JUDGEMENT_CORPUS:-}/
