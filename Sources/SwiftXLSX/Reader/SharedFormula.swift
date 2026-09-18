@@ -117,7 +117,13 @@ enum SharedFormula {
     private static func shift(_ ref: CellRef, rowDelta: Int, columnDelta: Int) -> CellRef? {
         let column = ref.absoluteColumn ? ref.column : ref.column + columnDelta
         let row = ref.absoluteRow ? ref.row : ref.row + rowDelta
-        guard column >= 1, row >= 1 else { return nil }
+        // Off the sheet in either direction is `#REF!`, which is what Excel shows. The old
+        // guard checked only the near edges, so a reference at the last row shifted down
+        // became row 1,048,577 — a position that cannot exist, carried as though it could.
+        guard column >= 1, row >= 1,
+              column <= CellRef.lastOnSheet.column, row <= CellRef.lastOnSheet.row else {
+            return nil
+        }
         return CellRef(
             column: column,
             row: row,
@@ -126,9 +132,29 @@ enum SharedFormula {
         )
     }
 
+    /// Shifts a range, leaving a whole column's rows and a whole row's columns alone.
+    ///
+    /// `D:D` is held as rows 1 through 1,048,576 — the full span — because that is what it
+    /// selects. Adding a row offset to both ends of that walks the column off the bottom of
+    /// the sheet, and a shared formula covering a hundred rows turned every copy but the first
+    /// into `#REF!`.
+    ///
+    /// Excel does not move it, and the reason is not a special case: **a whole column has no
+    /// row to shift.** It already covers every row, so there is no offset that could change
+    /// which cells it names. The same holds for a whole row and a column offset.
+    ///
+    /// A span that is full in *both* directions — the whole sheet — shifts in neither, which
+    /// falls out of the two tests rather than needing a third.
     private static func shift(_ range: CellRange, rowDelta: Int, columnDelta: Int) -> CellRange? {
-        guard let start = shift(range.start, rowDelta: rowDelta, columnDelta: columnDelta),
-              let end = shift(range.end, rowDelta: rowDelta, columnDelta: columnDelta) else {
+        let everyRow = range.start.row == 1 && range.end.row == CellRef.lastOnSheet.row
+        let everyColumn = range.start.column == 1
+            && range.end.column == CellRef.lastOnSheet.column
+
+        let rows = everyRow ? 0 : rowDelta
+        let columns = everyColumn ? 0 : columnDelta
+
+        guard let start = shift(range.start, rowDelta: rows, columnDelta: columns),
+              let end = shift(range.end, rowDelta: rows, columnDelta: columns) else {
             return nil
         }
         return CellRange(from: start, to: end)

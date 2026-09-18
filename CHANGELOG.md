@@ -7,6 +7,35 @@
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-09-17
+
+### Fixed
+
+- **A whole column in a shared formula stays a whole column.** A shared formula is stored once
+  and translated for each cell it covers, by adding the row and column offsets to every
+  relative reference. `D:D` is held as rows 1 through 1,048,576 — the full span, because that
+  is what it selects — so the translation walked it off the bottom of the sheet and every copy
+  but the first became `#REF!`.
+
+  Not a special case: **a whole column has no row to shift.** It already covers every row, so
+  no offset can change which cells it names. Same for a whole row and a column offset; a span
+  full in both directions shifts in neither, which falls out rather than needing a third rule.
+
+- **A reference pushed off the sheet is `#REF!`.** The guard checked only the near edges, so a
+  reference at the last row shifted down became row 1,048,577 — a position that cannot exist,
+  carried as though it could.
+
+- **A newline in a cell is a newline.** Excel writes an embedded carriage return as the literal
+  text `_x000D_`; it is the format's escape for characters XML cannot carry, and nothing here
+  decoded it. A report read `Total_x000D_(net of tax)`, and — worse, because it is invisible —
+  any lookup key, `SUMIF` criterion or equality test carrying those eight characters matched
+  nothing and answered zero while looking right.
+
+  The writer encodes the same way, so a string with a line break survives a round trip, and an
+  existing `_x000D_` in someone's text is written `_x005F_x000D_` and comes back unchanged
+  rather than turning into a carriage return.
+
+
 ## [0.28.0] - 2026-09-17
 
 ### Added

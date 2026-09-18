@@ -26,7 +26,9 @@ public final class SharedStrings: @unchecked Sendable {
         <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="\(strings.count)" uniqueCount="\(strings.count)">
         """
         for s in strings {
-            xml += "<si><t>\(escapeXML(s))</t></si>"
+            // `xml:space="preserve"` because a string may begin or end with a space, and a
+            // conforming reader is entitled to strip it without it.
+            xml += "<si><t xml:space=\"preserve\">\(escapeXML(XMLText.encoded(s)))</t></si>"
         }
         xml += "</sst>"
         return xml

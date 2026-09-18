@@ -89,8 +89,12 @@ final class SharedStringsParser: NSObject, XMLParserDelegate {
         case "rPh":
             inRPh = false
         case "si":
-            entries.append(Entry(text: currentText,
-                                 phonetic: currentPhonetic.isEmpty ? nil : currentPhonetic))
+            // Decoded here, once the whole string is assembled. `foundCharacters` can deliver
+            // one `<t>` in several pieces, and an escape split across two of them would not be
+            // recognised by either.
+            entries.append(Entry(
+                text: XMLText.decoded(currentText),
+                phonetic: currentPhonetic.isEmpty ? nil : XMLText.decoded(currentPhonetic)))
             currentText = ""
             currentPhonetic = ""
             inSI = false
