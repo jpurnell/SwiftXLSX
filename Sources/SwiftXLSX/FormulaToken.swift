@@ -87,6 +87,16 @@ public enum FormulaToken: Equatable, Sendable {
     case colon
     /// An exclamation mark `!` (sheet reference separator).
     case exclamation
+    /// A left brace `{`, opening an array constant.
+    case leftBrace
+    /// A right brace `}`, closing an array constant.
+    case rightBrace
+    /// A semicolon `;`, separating the rows of an array constant.
+    ///
+    /// The **file format's** row separator, and the only one a reader sees. Excel displays a
+    /// different character in some locales — `\` where the list separator is already `;` —
+    /// but the stored XML always uses `;`, so nothing here is locale-dependent.
+    case semicolon
 
     // MARK: - Sentinel
 

@@ -168,6 +168,9 @@ public enum FormulaLexer {
         case ",": return .comma
         case ":": return .colon
         case "!": return .exclamation // LIVE: public API for consumers
+        case "{": return .leftBrace
+        case "}": return .rightBrace
+        case ";": return .semicolon
         default: return nil
         }
     }

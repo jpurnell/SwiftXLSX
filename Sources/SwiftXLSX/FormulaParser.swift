@@ -173,6 +173,9 @@ private struct TokenParser {
         case .greaterThan: return ">"
         case .lessOrEqual: return "<="
         case .greaterOrEqual: return ">="
+        case .leftBrace: return "{"
+        case .rightBrace: return "}"
+        case .semicolon: return ";"
         case .leftParen: return "("
         case .rightParen: return ")"
         case .comma: return ","
@@ -346,6 +349,9 @@ private struct TokenParser {
             try expect(.rightParen)
             return expr
 
+        case .leftBrace:
+            return try parseArrayConstant()
+
         default:
             throw FormulaParseError(
                 kind: .unexpectedToken(
@@ -355,6 +361,101 @@ private struct TokenParser {
                 offset: position,
                 formula: formula
             )
+        }
+    }
+
+    // MARK: - Array Constants
+
+    /// Parses `{1,2,3;4,5,6}` — rows of literals, columns by comma and rows by semicolon.
+    ///
+    /// ## Only constants, and the grammar is where that is enforced
+    ///
+    /// Excel rejects a reference, a name, a function call or a nested array inside an array
+    /// constant. So does this: each element must be a number, a string, a boolean or an
+    /// error, optionally signed. Refusing here rather than downstream is what lets
+    /// `FormulaAST.arrayConstant` promise its contents are literals — a promise several
+    /// consumers rely on, including the dependency graph, which does not walk the elements
+    /// because there is nothing in them to find.
+    ///
+    /// ## Every row is the same width
+    ///
+    /// `{1,2;3}` is a syntax error in Excel, not a 2×2 with a hole, and a ragged array would
+    /// reach a `CellMatrix` initialiser that could only reject it later and less clearly.
+    /// Checked against the first row, so the error names the row that broke the shape.
+    private mutating func parseArrayConstant() throws -> FormulaAST {
+        let opening = position
+        advance()
+
+        var rows: [[FormulaAST]] = []
+        var row: [FormulaAST] = []
+        // Bounded by the tokens that exist, which is a true ceiling: every element consumes
+        // at least one. An unbounded `while true` would terminate here too — each branch
+        // advances, returns or throws — but "would terminate" is an argument about the body
+        // rather than a property of the loop, and the next edit to the body is where that
+        // argument stops holding.
+        for _ in 0...tokens.count {
+            row.append(try parseArrayElement())
+            switch currentToken {
+            case .comma:
+                advance()
+            case .semicolon:
+                advance()
+                rows.append(row)
+                row = []
+            case .rightBrace:
+                advance()
+                rows.append(row)
+                guard let width = rows.first?.count,
+                      rows.allSatisfy({ $0.count == width }) else {
+                    throw FormulaParseError(
+                        kind: .unexpectedToken(expected: "rows of equal width",
+                                               found: "a ragged array constant"),
+                        offset: opening, formula: formula)
+                }
+                return .arrayConstant(rows)
+            default:
+                throw FormulaParseError(
+                    kind: .unexpectedToken(expected: ", ; or }",
+                                           found: describeToken(currentToken)),
+                    offset: position, formula: formula)
+            }
+        }
+        // Unreachable while every element consumes a token — and reported rather than
+        // trapped, because an unterminated array is bad input, not a broken invariant.
+        throw FormulaParseError(
+            kind: .unexpectedEnd(expected: "}"), offset: opening, formula: formula)
+    }
+
+    /// One element of an array constant: a literal, optionally signed.
+    ///
+    /// - Returns: The element, with a leading sign folded into the number so that every
+    ///   element of an array constant is a literal in the tree and not only in the grammar.
+    private mutating func parseArrayElement() throws -> FormulaAST {
+        var sign = 1.0
+        while currentToken == .minus || currentToken == .plus {
+            if currentToken == .minus { sign = -sign }
+            advance()
+        }
+
+        let token = currentToken
+        switch token {
+        case .number(let value):
+            advance()
+            return .number(sign * value)
+        case .string(let value) where sign.isEqual(to: 1):
+            advance()
+            return .text(value)
+        case .bool(let value) where sign.isEqual(to: 1):
+            advance()
+            return .bool(value)
+        case .error(let value) where sign.isEqual(to: 1):
+            advance()
+            return .error(value)
+        default:
+            throw FormulaParseError(
+                kind: .unexpectedToken(expected: "a number, text, boolean or error",
+                                       found: describeToken(token)),
+                offset: position, formula: formula)
         }
     }
 

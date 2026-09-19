@@ -7,6 +7,36 @@
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-09-19
+
+### Added
+
+- **Array constants parse and serialize: `{1,2,3;4,5,6}`.** Core Excel syntax that this
+  package could not read at all — the lexer had no `{`, `}` or `;` token, so the first brace
+  ended parsing. The gap looked like a decision nobody had got to; it was simply missing.
+
+  Columns by comma, rows by semicolon. Those are the **file format's** separators and the only
+  ones a reader ever sees: a workbook saved in a locale that displays `\` between rows still
+  holds `;` in its XML, so nothing here is locale-dependent.
+
+  Only constants go inside — numbers, text, booleans and errors, optionally signed. A
+  reference, a name, a function call or a nested array is refused, as Excel refuses them. A
+  leading sign is folded into the number, so `{-1,2}` holds `.number(-1)` and every element of
+  an array constant is a literal *in the tree*, not only in the grammar. That is what lets
+  `FormulaAST.arrayConstant` promise its contents to consumers that do not walk them.
+
+  A ragged constant is a syntax error, not a 2×2 with a hole — `{1,2;3}` is refused, which is
+  Excel's rule and also spares a `CellMatrix` initialiser from rejecting it later and less
+  clearly.
+
+  Shared-formula translation returns one unchanged: there is nothing inside to shift, so every
+  copy gets the same array.
+
+  Requires SwiftExcelCore **0.13.0** for `FormulaAST.arrayConstant`.
+
+  Found from the side. A test in SwiftExcelFunctions wanted a two-row array to check that
+  `ROWS` still counts an array from its values, and could not spell one.
+
 ## [0.30.0] - 2026-09-19
 
 ### Fixed

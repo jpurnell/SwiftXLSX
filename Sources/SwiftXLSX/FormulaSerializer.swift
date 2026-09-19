@@ -29,7 +29,7 @@ public enum FormulaSerializer {
         case .negate:
             return 6
         case .function, .call, .cellRef, .cellRange, .sheetRef, .namedRange,
-             .number, .text, .bool, .error:
+             .number, .text, .bool, .error, .arrayConstant:
             // A call binds tightest, like any other primary. `f(1)*2` needs no brackets
             // around the call and must not acquire any, or the round trip stops being one.
             return 7
@@ -92,6 +92,16 @@ public enum FormulaSerializer {
             return serializeBinary(ast, left, ">=", right, rightAssociative: false, depth: depth)
         case .lessOrEqual(let left, let right):
             return serializeBinary(ast, left, "<=", right, rightAssociative: false, depth: depth)
+
+        case .arrayConstant(let rows):
+            // Columns by comma, rows by semicolon — the file format's separators, which are
+            // the only ones a reader sees whatever a locale displays. Depth still increments:
+            // an array constant holds only constants, so it cannot nest, but the guard costs
+            // nothing and the next case to hold expressions would want it already there.
+            let rowStrings = rows.map { row in
+                row.map { serializeNode($0, depth: depth + 1) }.joined(separator: ",")
+            }
+            return "{\(rowStrings.joined(separator: ";"))}"
 
         case .function(let name, let args):
             let argStrings = args.map { serializeNode($0, depth: depth + 1) }

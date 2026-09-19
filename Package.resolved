@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftExcelCore",
       "state" : {
-        "revision" : "b458fe1ed02c9d2f0739e0e662275b81438d7d1a",
-        "version" : "0.12.0"
+        "revision" : "99aa4e50c4eba4f5b2d70b0924a50ce80b97b701",
+        "version" : "0.13.0"
       }
     },
     {

@@ -50,8 +50,10 @@ enum SharedFormula {
             }
             return .sheetRef(SheetReference(sheet: reference.sheetName, range: shifted))
 
-        // An absent argument shifts to itself: there is nothing in it to move.
-        case .namedRange, .number, .text, .bool, .error, .missing:
+        // An absent argument shifts to itself: there is nothing in it to move. Nor is there
+        // anything in an array constant — it holds only literals, so every copy of a shared
+        // formula containing one gets the same array, which is what Excel does.
+        case .namedRange, .number, .text, .bool, .error, .missing, .arrayConstant:
             return ast
 
         case .add(let lhs, let rhs):
