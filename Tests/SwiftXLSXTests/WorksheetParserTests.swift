@@ -1,8 +1,10 @@
-import XCTest
+import Testing
+import Foundation
 import SwiftZIP
 @testable import SwiftXLSX
 
-final class WorksheetParserTests: XCTestCase {
+@Suite
+struct WorksheetParserTests {
 
     // MARK: - Helpers
 
@@ -46,51 +48,57 @@ final class WorksheetParserTests: XCTestCase {
     // MARK: - Cell Values
 
     // 1. Number cell
+    @Test("Number cell")
     func testNumberCell() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1"><v>42</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(42))
+        #expect(sheet.cell(at: "A1") == .number(42))
     }
 
     // 2. Text cell (shared string)
+    @Test("Text cell shared string")
     func testTextCellSharedString() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="s"><v>0</v></c></row>
         """)
         let sheet = try parseSheet(data: data, sharedStrings: ["Hello World"])
-        XCTAssertEqual(sheet.cell(at: "A1"), .text("Hello World"))
+        #expect(sheet.cell(at: "A1") == .text("Hello World"))
     }
 
     // 3. Boolean true
+    @Test("Boolean true")
     func testBooleanTrue() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="b"><v>1</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .bool(true))
+        #expect(sheet.cell(at: "A1") == .bool(true))
     }
 
     // 4. Boolean false
+    @Test("Boolean false")
     func testBooleanFalse() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="b"><v>0</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .bool(false))
+        #expect(sheet.cell(at: "A1") == .bool(false))
     }
 
     // 5. Error cell
+    @Test("Error cell")
     func testErrorCell() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="e"><v>#VALUE!</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .error(.value))
+        #expect(sheet.cell(at: "A1") == .error(.value))
     }
 
     // 6. Formula cell
+    @Test("Formula cell")
     func testFormulaCell() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1"><f>A2+A3</f></c></row>
@@ -98,13 +106,14 @@ final class WorksheetParserTests: XCTestCase {
         let sheet = try parseSheet(data: data)
         let value = sheet.cell(at: "A1")
         guard case .formula(let ast, _) = value else {
-            XCTFail("Expected formula cell"); return
+            Issue.record("Expected formula cell"); return
         }
         // Should parse to add(cellRef(A2), cellRef(A3))
-        XCTAssertEqual(ast, .add(.cellRef(CellRef("A2")), .cellRef(CellRef("A3"))))
+        #expect(ast == .add(.cellRef(CellRef("A2")), .cellRef(CellRef("A3"))))
     }
 
     // 7. Formula with cached value
+    @Test("Formula cached value")
     func testFormulaCachedValue() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1"><f>1+2</f><v>3</v></c></row>
@@ -112,12 +121,13 @@ final class WorksheetParserTests: XCTestCase {
         let sheet = try parseSheet(data: data)
         let value = sheet.cell(at: "A1")
         guard case .formula(_, let cached) = value else {
-            XCTFail("Expected formula cell"); return
+            Issue.record("Expected formula cell"); return
         }
-        XCTAssertEqual(cached, .number(3))
+        #expect(cached == .number(3))
     }
 
     // 8. Empty cell with style index
+    @Test("Empty cell with style")
     func testEmptyCellWithStyle() throws {
         var styles = ParsedStyleSheet()
         styles.fonts = [Font(bold: true)]
@@ -131,28 +141,31 @@ final class WorksheetParserTests: XCTestCase {
         <row r="1"><c r="A1" s="1"/></row>
         """)
         let sheet = try parseSheet(data: data, styles: styles)
-        XCTAssertEqual(sheet.cell(at: "A1"), .blank)
+        #expect(sheet.cell(at: "A1") == .blank)
     }
 
     // 9. Decimal number
+    @Test("Decimal number")
     func testDecimalNumber() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1"><v>3.14159</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(3.14159))
+        #expect(sheet.cell(at: "A1") == .number(3.14159))
     }
 
     // 10. Negative number
+    @Test("Negative number")
     func testNegativeNumber() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1"><v>-100.5</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(-100.5))
+        #expect(sheet.cell(at: "A1") == .number(-100.5))
     }
 
     // 11. Multiple cells in one row
+    @Test("Multiple cells in one row")
     func testMultipleCellsInOneRow() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1">
@@ -162,12 +175,13 @@ final class WorksheetParserTests: XCTestCase {
         </row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(1))
-        XCTAssertEqual(sheet.cell(at: "B1"), .number(2))
-        XCTAssertEqual(sheet.cell(at: "C1"), .number(3))
+        #expect(sheet.cell(at: "A1") == .number(1))
+        #expect(sheet.cell(at: "B1") == .number(2))
+        #expect(sheet.cell(at: "C1") == .number(3))
     }
 
     // 12. Multiple rows
+    @Test("Multiple rows")
     func testMultipleRows() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1"><v>10</v></c></row>
@@ -175,14 +189,15 @@ final class WorksheetParserTests: XCTestCase {
         <row r="3"><c r="A3"><v>30</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(10))
-        XCTAssertEqual(sheet.cell(at: "A2"), .number(20))
-        XCTAssertEqual(sheet.cell(at: "A3"), .number(30))
+        #expect(sheet.cell(at: "A1") == .number(10))
+        #expect(sheet.cell(at: "A2") == .number(20))
+        #expect(sheet.cell(at: "A3") == .number(30))
     }
 
     // MARK: - Styles
 
     // 13. Cell with style index
+    @Test("Cell with style index")
     func testCellWithStyleIndex() throws {
         var styles = ParsedStyleSheet()
         styles.fonts = [Font(), Font(bold: true)]
@@ -199,14 +214,17 @@ final class WorksheetParserTests: XCTestCase {
         """)
         let sheet = try parseSheet(data: data, styles: styles)
         // Verify the cell was stored (we can check value; style is internal)
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(42))
+        #expect(sheet.cell(at: "A1") == .number(42))
         // Access cells dict to verify style
-        let stored = sheet.cells["A1"]
-        XCTAssertNotNil(stored)
-        XCTAssertTrue(stored?.1.font.bold ?? false, "Expected bold font from style index 1")
+        let stored = try #require(sheet.cells["A1"])
+        // Style index 1 names font 1 and the default (nil) fill and border, so the
+        // resolved style is exactly a bold font over general formatting.
+        #expect(stored.1 == CellStyle(font: Font(bold: true)),
+                "Expected bold font from style index 1")
     }
 
     // 14. Cell with no style index defaults to index 0
+    @Test("Cell defaults to style index0")
     func testCellDefaultsToStyleIndex0() throws {
         var styles = ParsedStyleSheet()
         styles.fonts = [Font(name: "Arial", size: 12)]
@@ -218,14 +236,16 @@ final class WorksheetParserTests: XCTestCase {
         <row r="1"><c r="A1"><v>99</v></c></row>
         """)
         let sheet = try parseSheet(data: data, styles: styles)
-        let stored = sheet.cells["A1"]
-        XCTAssertNotNil(stored)
-        XCTAssertEqual(stored?.1.font.name, "Arial")
+        let stored = try #require(sheet.cells["A1"])
+        // No `s` attribute means style index 0, which names the one font in the table.
+        #expect(stored.1 == CellStyle(font: Font(name: "Arial", size: 12)))
+        #expect(stored.1.font.name == "Arial")
     }
 
     // MARK: - Layout Features
 
     // 15. Freeze panes
+    @Test("Freeze panes")
     func testFreezePanes() throws {
         let data = makeWorksheetXML(
             sheetData: "",
@@ -235,10 +255,11 @@ final class WorksheetParserTests: XCTestCase {
             </sheetView></sheetViews>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.frozenPaneRef, "A2")
+        #expect(sheet.frozenPaneRef == "A2")
     }
 
     // 16. Freeze panes at C3
+    @Test("Freeze panes at C 3")
     func testFreezePanesAtC3() throws {
         let data = makeWorksheetXML(
             sheetData: "",
@@ -248,10 +269,11 @@ final class WorksheetParserTests: XCTestCase {
             </sheetView></sheetViews>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.frozenPaneRef, "C3")
+        #expect(sheet.frozenPaneRef == "C3")
     }
 
     // 17. Column widths
+    @Test("Column widths")
     func testColumnWidths() throws {
         let data = makeWorksheetXML(
             sheetData: "",
@@ -259,10 +281,11 @@ final class WorksheetParserTests: XCTestCase {
             <cols><col min="1" max="1" width="20" customWidth="1"/></cols>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.columnWidths[1], 20)
+        #expect(sheet.columnWidths[1] == 20)
     }
 
     // 18. Column width span
+    @Test("Column width span")
     func testColumnWidthSpan() throws {
         let data = makeWorksheetXML(
             sheetData: "",
@@ -270,21 +293,23 @@ final class WorksheetParserTests: XCTestCase {
             <cols><col min="1" max="3" width="15" customWidth="1"/></cols>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.columnWidths[1], 15)
-        XCTAssertEqual(sheet.columnWidths[2], 15)
-        XCTAssertEqual(sheet.columnWidths[3], 15)
+        #expect(sheet.columnWidths[1] == 15)
+        #expect(sheet.columnWidths[2] == 15)
+        #expect(sheet.columnWidths[3] == 15)
     }
 
     // 19. Row height
+    @Test("Row height")
     func testRowHeight() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1" ht="40" customHeight="1"><c r="A1"><v>1</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.rowHeights[1], 40)
+        #expect(sheet.rowHeights[1] == 40)
     }
 
     // 20. Auto-filter
+    @Test("Auto filter")
     func testAutoFilter() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -292,10 +317,11 @@ final class WorksheetParserTests: XCTestCase {
             <autoFilter ref="A1:C10"/>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.autoFilterRange?.reference, "A1:C10")
+        #expect(sheet.autoFilterRange?.reference == "A1:C10")
     }
 
     // 21. Merge cells
+    @Test("Merge cells")
     func testMergeCells() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -303,11 +329,12 @@ final class WorksheetParserTests: XCTestCase {
             <mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.mergedCells.count, 1)
-        XCTAssertEqual(sheet.mergedCells.first?.reference, "A1:B2")
+        #expect(sheet.mergedCells.count == 1)
+        #expect(sheet.mergedCells.first?.reference == "A1:B2")
     }
 
     // 22. Multiple merge cells
+    @Test("Multiple merge cells")
     func testMultipleMergeCells() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -318,12 +345,13 @@ final class WorksheetParserTests: XCTestCase {
             </mergeCells>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.mergedCells.count, 2)
-        XCTAssertEqual(sheet.mergedCells[0].reference, "A1:B1")
-        XCTAssertEqual(sheet.mergedCells[1].reference, "C1:D1")
+        #expect(sheet.mergedCells.count == 2)
+        #expect(sheet.mergedCells[0].reference == "A1:B1")
+        #expect(sheet.mergedCells[1].reference == "C1:D1")
     }
 
     // 23. List validation
+    @Test("List validation")
     func testListValidation() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -335,12 +363,12 @@ final class WorksheetParserTests: XCTestCase {
             </dataValidations>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.validations.count, 1)
-        XCTAssertEqual(sheet.validations[0].range.reference, "A2:A10")
+        #expect(sheet.validations.count == 1)
+        #expect(sheet.validations[0].range.reference == "A2:A10")
         if case .list(let items) = sheet.validations[0].type {
-            XCTAssertEqual(items, ["Yes", "No", "Maybe"])
+            #expect(items == ["Yes", "No", "Maybe"])
         } else {
-            XCTFail("Expected list validation")
+            Issue.record("Expected list validation")
         }
     }
 
@@ -350,6 +378,7 @@ final class WorksheetParserTests: XCTestCase {
     /// `A1`, so a validation applied to a column came back applied to one cell. Fixed in
     /// SwiftExcelCore 0.14.0; this is the reader path that made it matter rather than a
     /// cosmetic issue.
+    @Test("A validation over A whole column")
     func testAValidationOverAWholeColumn() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -361,16 +390,16 @@ final class WorksheetParserTests: XCTestCase {
             </dataValidations>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.validations.count, 1)
+        #expect(sheet.validations.count == 1)
         let range = sheet.validations[0].range
-        XCTAssertEqual(range.start.column, 1)
-        XCTAssertEqual(range.start.row, 1)
-        XCTAssertEqual(range.end.column, 1)
-        XCTAssertEqual(range.end.row, CellRef.lastOnSheet.row,
-                       "a validation on a column applies to the column")
+        #expect(range.start.column == 1)
+        #expect(range.start.row == 1)
+        #expect(range.end.column == 1)
+        #expect(range.end.row == CellRef.lastOnSheet.row, "a validation on a column applies to the column")
     }
 
     /// A validation over a **whole row**, which used to land in column zero.
+    @Test("A validation over A whole row")
     func testAValidationOverAWholeRow() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -382,15 +411,16 @@ final class WorksheetParserTests: XCTestCase {
             </dataValidations>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.validations.count, 1)
+        #expect(sheet.validations.count == 1)
         let range = sheet.validations[0].range
-        XCTAssertGreaterThanOrEqual(range.start.column, 1, "columns are 1-based")
-        XCTAssertEqual(range.start.row, 3)
-        XCTAssertEqual(range.end.column, CellRef.lastOnSheet.column)
-        XCTAssertEqual(range.end.row, 3)
+        #expect(range.start.column >= 1, "columns are 1-based")
+        #expect(range.start.row == 3)
+        #expect(range.end.column == CellRef.lastOnSheet.column)
+        #expect(range.end.row == 3)
     }
 
     // 24. Decimal validation
+    @Test("Decimal validation")
     func testDecimalValidation() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -403,16 +433,17 @@ final class WorksheetParserTests: XCTestCase {
             </dataValidations>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.validations.count, 1)
+        #expect(sheet.validations.count == 1)
         if case .decimal(let min, let max) = sheet.validations[0].type {
-            XCTAssertEqual(min, 0, accuracy: 0.001)
-            XCTAssertEqual(max, 100, accuracy: 0.001)
+            #expect(abs(min - 0) < 0.001)
+            #expect(abs(max - 100) < 0.001)
         } else {
-            XCTFail("Expected decimal validation")
+            Issue.record("Expected decimal validation")
         }
     }
 
     // 25. Integer validation
+    @Test("Integer validation")
     func testIntegerValidation() throws {
         let data = makeFullWorksheetXML(
             sheetData: "",
@@ -425,40 +456,43 @@ final class WorksheetParserTests: XCTestCase {
             </dataValidations>
             """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.validations.count, 1)
+        #expect(sheet.validations.count == 1)
         if case .integer(let min, let max) = sheet.validations[0].type {
-            XCTAssertEqual(min, 1)
-            XCTAssertEqual(max, 999)
+            #expect(min == 1)
+            #expect(max == 999)
         } else {
-            XCTFail("Expected integer validation")
+            Issue.record("Expected integer validation")
         }
     }
 
     // MARK: - Edge Cases
 
     // 26. Empty worksheet
+    @Test("Empty worksheet")
     func testEmptyWorksheet() throws {
         let data = makeWorksheetXML(sheetData: "")
         let sheet = try parseSheet(data: data)
-        XCTAssertTrue(sheet.cells.isEmpty)
+        #expect(sheet.cells.isEmpty)
     }
 
     // 27. No layout features, just cells
+    @Test("No layout features just cells")
     func testNoLayoutFeaturesJustCells() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1"><v>42</v></c></row>
         """)
         let sheet = try parseSheet(data: data)
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(42))
-        XCTAssertNil(sheet.frozenPaneRef)
-        XCTAssertTrue(sheet.columnWidths.isEmpty)
-        XCTAssertTrue(sheet.rowHeights.isEmpty)
-        XCTAssertNil(sheet.autoFilterRange)
-        XCTAssertTrue(sheet.mergedCells.isEmpty)
-        XCTAssertTrue(sheet.validations.isEmpty)
+        #expect(sheet.cell(at: "A1") == .number(42))
+        #expect(sheet.frozenPaneRef == nil)
+        #expect(sheet.columnWidths.isEmpty)
+        #expect(sheet.rowHeights.isEmpty)
+        #expect(sheet.autoFilterRange == nil)
+        #expect(sheet.mergedCells.isEmpty)
+        #expect(sheet.validations.isEmpty)
     }
 
     // 28. All features combined
+    @Test("All features combined")
     func testAllFeaturesCombined() throws {
         let data = makeFullWorksheetXML(
             sheetData: """
@@ -488,34 +522,36 @@ final class WorksheetParserTests: XCTestCase {
         let sheet = try parseSheet(data: data, sharedStrings: ["Header"])
 
         // Cells
-        XCTAssertEqual(sheet.cell(at: "A1"), .text("Header"))
-        XCTAssertEqual(sheet.cell(at: "B1"), .number(100))
+        #expect(sheet.cell(at: "A1") == .text("Header"))
+        #expect(sheet.cell(at: "B1") == .number(100))
         guard case .formula(_, let cached) = sheet.cell(at: "A2") else {
-            XCTFail("Expected formula"); return
+            Issue.record("Expected formula"); return
         }
-        XCTAssertEqual(cached, .number(200))
+        #expect(cached == .number(200))
 
         // Layout
-        XCTAssertEqual(sheet.frozenPaneRef, "A2")
-        XCTAssertEqual(sheet.columnWidths[1], 25)
-        XCTAssertEqual(sheet.rowHeights[1], 30)
-        XCTAssertEqual(sheet.autoFilterRange?.reference, "A1:B10")
-        XCTAssertEqual(sheet.mergedCells.count, 1)
-        XCTAssertEqual(sheet.mergedCells.first?.reference, "D1:E1")
-        XCTAssertEqual(sheet.validations.count, 1)
+        #expect(sheet.frozenPaneRef == "A2")
+        #expect(sheet.columnWidths[1] == 25)
+        #expect(sheet.rowHeights[1] == 30)
+        #expect(sheet.autoFilterRange?.reference == "A1:B10")
+        #expect(sheet.mergedCells.count == 1)
+        #expect(sheet.mergedCells.first?.reference == "D1:E1")
+        #expect(sheet.validations.count == 1)
     }
 
     // 29. Shared string index out of range
+    @Test("Shared string index out of range")
     func testSharedStringIndexOutOfRange() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="s"><v>99</v></c></row>
         """)
         let sheet = try parseSheet(data: data, sharedStrings: ["Only One"])
         // Out-of-range index should use empty string
-        XCTAssertEqual(sheet.cell(at: "A1"), .text(""))
+        #expect(sheet.cell(at: "A1") == .text(""))
     }
 
     // 30. Large worksheet (100 rows x 5 columns)
+    @Test("Large worksheet")
     func testLargeWorksheet() throws {
         var rows = ""
         for r in 1...100 {
@@ -532,16 +568,17 @@ final class WorksheetParserTests: XCTestCase {
         let data = makeWorksheetXML(sheetData: rows)
         let sheet = try parseSheet(data: data)
         // Spot check
-        XCTAssertEqual(sheet.cell(at: "A1"), .number(11))
-        XCTAssertEqual(sheet.cell(at: "E1"), .number(15))
-        XCTAssertEqual(sheet.cell(at: "A100"), .number(1001))
-        XCTAssertEqual(sheet.cell(at: "E100"), .number(1005))
-        XCTAssertEqual(sheet.cells.count, 500)
+        #expect(sheet.cell(at: "A1") == .number(11))
+        #expect(sheet.cell(at: "E1") == .number(15))
+        #expect(sheet.cell(at: "A100") == .number(1001))
+        #expect(sheet.cell(at: "E100") == .number(1005))
+        #expect(sheet.cells.count == 500)
     }
 
     // MARK: - Error Types
 
     // 31. All error types
+    @Test("All error types")
     func testAllErrorTypes() throws {
         let errors: [(String, ExcelError)] = [
             ("#VALUE!", .value),
@@ -559,12 +596,12 @@ final class WorksheetParserTests: XCTestCase {
             <row r="\(row)"><c r="\(ref)" t="e"><v>\(rawValue)</v></c></row>
             """)
             let sheet = try parseSheet(data: data)
-            XCTAssertEqual(sheet.cell(at: ref), .error(expected),
-                           "Failed for error \(rawValue)")
+            #expect(sheet.cell(at: ref) == .error(expected), "Failed for error \(rawValue)")
         }
     }
 
     // 32. Formula with _RAW fallback for unparseable formula
+    @Test("Formula raw fallback")
     func testFormulaRawFallback() throws {
         // Use something that cannot be parsed as a standard formula
         let data = makeWorksheetXML(sheetData: """
@@ -573,21 +610,25 @@ final class WorksheetParserTests: XCTestCase {
         let sheet = try parseSheet(data: data)
         let value = sheet.cell(at: "A1")
         guard case .formula(let ast, _) = value else {
-            XCTFail("Expected formula cell"); return
+            Issue.record("Expected formula cell"); return
         }
-        // Should fall back to _RAW
-        if case .function("_RAW", let args) = ast, let first = args.first,
-           case .text(let raw) = first {
-            XCTAssertTrue(raw.contains("TRANSPOSE"))
-        } else {
-            // If it somehow parsed, that's also fine
-            XCTAssertNotNil(ast)
+        // An array constant may hold only literals, so `{TRANSPOSE(A1:A5)}` cannot parse.
+        // The reader must wrap the original text in `_RAW` rather than lose it.
+        guard case .function(let name, let args) = ast else {
+            Issue.record("Expected the _RAW fallback, got \(ast)"); return
         }
+        #expect(name == "_RAW")
+        #expect(args.count == 1)
+        guard let first = args.first, case .text(let raw) = first else {
+            Issue.record("_RAW should carry the original formula text, got \(args)"); return
+        }
+        #expect(raw == "{TRANSPOSE(A1:A5)}")
     }
 
     // MARK: - Round-Trip Tests
 
     // 33. Write numbers and text, generate XML, parse back
+    @Test("Round trip numbers and text")
     func testRoundTripNumbersAndText() throws {
         let workbook = Workbook()
         let original = workbook.addSheet(name: "Data")
@@ -606,7 +647,7 @@ final class WorksheetParserTests: XCTestCase {
         let zipData = try Data(contentsOf: tempURL)
         let entries = try SwiftZIP.ZIPReader.read(from: zipData)
         guard let wsEntry = entries.first(where: { $0.path.contains("sheet1.xml") }) else {
-            XCTFail("Missing sheet1.xml in archive"); return
+            Issue.record("Missing sheet1.xml in archive"); return
         }
 
         // Extract shared strings and styles
@@ -621,12 +662,13 @@ final class WorksheetParserTests: XCTestCase {
                                     sharedStrings: sharedStrings,
                                     styles: styles)
 
-        XCTAssertEqual(parsed.cell(at: "A1"), .text("Hello"))
-        XCTAssertEqual(parsed.cell(at: "B1"), .number(42))
-        XCTAssertEqual(parsed.cell(at: "C1"), .number(-3.14))
+        #expect(parsed.cell(at: "A1") == .text("Hello"))
+        #expect(parsed.cell(at: "B1") == .number(42))
+        #expect(parsed.cell(at: "C1") == .number(-3.14))
     }
 
     // 34. Write styled cells, parse back, verify styles match
+    @Test("Round trip styles")
     func testRoundTripStyles() throws {
         let workbook = Workbook()
         let original = workbook.addSheet(name: "Styled")
@@ -641,7 +683,7 @@ final class WorksheetParserTests: XCTestCase {
         let zipData = try Data(contentsOf: tempURL)
         let entries = try SwiftZIP.ZIPReader.read(from: zipData)
         guard let wsEntry = entries.first(where: { $0.path.contains("sheet1.xml") }) else {
-            XCTFail("Missing sheet1.xml"); return
+            Issue.record("Missing sheet1.xml"); return
         }
         let ssEntry = entries.first(where: { $0.path.contains("sharedStrings.xml") })
         let stEntry = entries.first(where: { $0.path.contains("styles.xml") })
@@ -652,17 +694,20 @@ final class WorksheetParserTests: XCTestCase {
                                     sharedStrings: sharedStrings,
                                     styles: styles)
 
-        // Verify bold font on A1
-        let a1Style = parsed.cells["A1"]?.1
-        XCTAssertNotNil(a1Style)
-        XCTAssertTrue(a1Style?.font.bold ?? false, "A1 should have bold font")
+        // Verify bold font on A1 — written with `.header`, which is a bold font and
+        // nothing else, so that is what must come back.
+        let a1Style = try #require(parsed.cells["A1"]?.1)
+        #expect(a1Style.font.bold, "A1 should have bold font")
+        #expect(a1Style.font == Font(bold: true), "A1 should carry `.header`'s font")
+        #expect(a1Style.numberFormat == .general, "A1 was written with general formatting")
 
         // Verify values survived
-        XCTAssertEqual(parsed.cell(at: "A1"), .text("Bold"))
-        XCTAssertEqual(parsed.cell(at: "B1"), .number(1000))
+        #expect(parsed.cell(at: "A1") == .text("Bold"))
+        #expect(parsed.cell(at: "B1") == .number(1000))
     }
 
     // 35. Write formulas, parse back
+    @Test("Round trip formulas")
     func testRoundTripFormulas() throws {
         let workbook = Workbook()
         let original = workbook.addSheet(name: "Formulas")
@@ -679,7 +724,7 @@ final class WorksheetParserTests: XCTestCase {
         let zipData = try Data(contentsOf: tempURL)
         let entries = try SwiftZIP.ZIPReader.read(from: zipData)
         guard let wsEntry = entries.first(where: { $0.path.contains("sheet1.xml") }) else {
-            XCTFail("Missing sheet1.xml"); return
+            Issue.record("Missing sheet1.xml"); return
         }
         let ssEntry = entries.first(where: { $0.path.contains("sharedStrings.xml") })
         let stEntry = entries.first(where: { $0.path.contains("styles.xml") })
@@ -693,19 +738,20 @@ final class WorksheetParserTests: XCTestCase {
         // A3 should have formula A1+A2
         let a3 = parsed.cell(at: "A3")
         guard case .formula(let ast3, _) = a3 else {
-            XCTFail("Expected formula at A3"); return
+            Issue.record("Expected formula at A3"); return
         }
-        XCTAssertEqual(ast3, .add(.cellRef(CellRef("A1")), .cellRef(CellRef("A2"))))
+        #expect(ast3 == .add(.cellRef(CellRef("A1")), .cellRef(CellRef("A2"))))
 
         // A4 should have SUM(A1:A2)
         let a4 = parsed.cell(at: "A4")
         guard case .formula(let ast4, _) = a4 else {
-            XCTFail("Expected formula at A4"); return
+            Issue.record("Expected formula at A4"); return
         }
-        XCTAssertEqual(ast4, .function("SUM", [.cellRange(CellRange("A1:A2"))]))
+        #expect(ast4 == .function("SUM", [.cellRange(CellRange("A1:A2"))]))
     }
 
     // 36. Write layout features, parse back
+    @Test("Round trip layout features")
     func testRoundTripLayoutFeatures() throws {
         let workbook = Workbook()
         let original = workbook.addSheet(name: "Layout")
@@ -725,7 +771,7 @@ final class WorksheetParserTests: XCTestCase {
         let zipData = try Data(contentsOf: tempURL)
         let entries = try SwiftZIP.ZIPReader.read(from: zipData)
         guard let wsEntry = entries.first(where: { $0.path.contains("sheet1.xml") }) else {
-            XCTFail("Missing sheet1.xml"); return
+            Issue.record("Missing sheet1.xml"); return
         }
         let ssEntry = entries.first(where: { $0.path.contains("sharedStrings.xml") })
         let stEntry = entries.first(where: { $0.path.contains("styles.xml") })
@@ -736,21 +782,22 @@ final class WorksheetParserTests: XCTestCase {
                                     sharedStrings: sharedStrings,
                                     styles: styles)
 
-        XCTAssertEqual(parsed.frozenPaneRef, "A2")
-        XCTAssertEqual(parsed.columnWidths[1], 25)
-        XCTAssertEqual(parsed.rowHeights[1], 30)
-        XCTAssertEqual(parsed.autoFilterRange?.reference, "A1:C10")
-        XCTAssertEqual(parsed.mergedCells.count, 1)
-        XCTAssertEqual(parsed.mergedCells.first?.reference, "D1:E1")
-        XCTAssertEqual(parsed.validations.count, 1)
+        #expect(parsed.frozenPaneRef == "A2")
+        #expect(parsed.columnWidths[1] == 25)
+        #expect(parsed.rowHeights[1] == 30)
+        #expect(parsed.autoFilterRange?.reference == "A1:C10")
+        #expect(parsed.mergedCells.count == 1)
+        #expect(parsed.mergedCells.first?.reference == "D1:E1")
+        #expect(parsed.validations.count == 1)
         if case .list(let items) = parsed.validations[0].type {
-            XCTAssertEqual(items, ["Yes", "No"])
+            #expect(items == ["Yes", "No"])
         } else {
-            XCTFail("Expected list validation")
+            Issue.record("Expected list validation")
         }
     }
 
     // 37. Full round-trip with all features
+    @Test("Full round trip")
     func testFullRoundTrip() throws {
         let workbook = Workbook()
         let original = workbook.addSheet(name: "Full")
@@ -778,7 +825,7 @@ final class WorksheetParserTests: XCTestCase {
         let zipData = try Data(contentsOf: tempURL)
         let entries = try SwiftZIP.ZIPReader.read(from: zipData)
         guard let wsEntry = entries.first(where: { $0.path.contains("sheet1.xml") }) else {
-            XCTFail("Missing sheet1.xml"); return
+            Issue.record("Missing sheet1.xml"); return
         }
         let ssEntry = entries.first(where: { $0.path.contains("sharedStrings.xml") })
         let stEntry = entries.first(where: { $0.path.contains("styles.xml") })
@@ -790,46 +837,46 @@ final class WorksheetParserTests: XCTestCase {
                                     styles: styles)
 
         // Cell values
-        XCTAssertEqual(parsed.cell(at: "A1"), .text("Name"))
-        XCTAssertEqual(parsed.cell(at: "B1"), .text("Amount"))
-        XCTAssertEqual(parsed.cell(at: "A2"), .text("Alice"))
-        XCTAssertEqual(parsed.cell(at: "B2"), .number(100))
-        XCTAssertEqual(parsed.cell(at: "A3"), .text("Bob"))
-        XCTAssertEqual(parsed.cell(at: "B3"), .number(200))
+        #expect(parsed.cell(at: "A1") == .text("Name"))
+        #expect(parsed.cell(at: "B1") == .text("Amount"))
+        #expect(parsed.cell(at: "A2") == .text("Alice"))
+        #expect(parsed.cell(at: "B2") == .number(100))
+        #expect(parsed.cell(at: "A3") == .text("Bob"))
+        #expect(parsed.cell(at: "B3") == .number(200))
 
         // Formula
         guard case .formula(let ast, _) = parsed.cell(at: "B4") else {
-            XCTFail("Expected formula at B4"); return
+            Issue.record("Expected formula at B4"); return
         }
-        XCTAssertEqual(ast, .function("SUM", [.cellRange(CellRange("B2:B3"))]))
+        #expect(ast == .function("SUM", [.cellRange(CellRange("B2:B3"))]))
 
         // Layout
-        XCTAssertEqual(parsed.frozenPaneRef, "A2")
-        XCTAssertEqual(parsed.columnWidths[1], 20)
-        XCTAssertEqual(parsed.columnWidths[2], 15)
-        XCTAssertEqual(parsed.rowHeights[1], 25)
-        XCTAssertEqual(parsed.autoFilterRange?.reference, "A1:B3")
-        XCTAssertEqual(parsed.mergedCells.count, 1)
-        XCTAssertEqual(parsed.mergedCells.first?.reference, "C1:D1")
+        #expect(parsed.frozenPaneRef == "A2")
+        #expect(parsed.columnWidths[1] == 20)
+        #expect(parsed.columnWidths[2] == 15)
+        #expect(parsed.rowHeights[1] == 25)
+        #expect(parsed.autoFilterRange?.reference == "A1:B3")
+        #expect(parsed.mergedCells.count == 1)
+        #expect(parsed.mergedCells.first?.reference == "C1:D1")
 
         // Validations
-        XCTAssertEqual(parsed.validations.count, 2)
+        #expect(parsed.validations.count == 2)
         if case .decimal(let min, let max) = parsed.validations[0].type {
-            XCTAssertEqual(min, 0, accuracy: 0.001)
-            XCTAssertEqual(max, 1000, accuracy: 0.001)
+            #expect(abs(min - 0) < 0.001)
+            #expect(abs(max - 1000) < 0.001)
         } else {
-            XCTFail("Expected decimal validation")
+            Issue.record("Expected decimal validation")
         }
         if case .integer(let min, let max) = parsed.validations[1].type {
-            XCTAssertEqual(min, 1)
-            XCTAssertEqual(max, 100)
+            #expect(min == 1)
+            #expect(max == 100)
         } else {
-            XCTFail("Expected integer validation")
+            Issue.record("Expected integer validation")
         }
 
         // Styles survived (header cells should be bold)
         let a1Style = parsed.cells["A1"]?.1
-        XCTAssertTrue(a1Style?.font.bold ?? false, "Header should be bold")
+        #expect(a1Style?.font.bold ?? false, "Header should be bold")
     }
 
     // MARK: - Phonetic readings
@@ -837,6 +884,7 @@ final class WorksheetParserTests: XCTestCase {
     /// **The whole thread, end to end.** A shared string carrying a reading is resolved
     /// into a cell, and the reading is recorded against that cell's reference rather than
     /// against the string — because `PHONETIC(A1)` asks about a position.
+    @Test("Phonetic is recorded against the cell")
     func testPhoneticIsRecordedAgainstTheCell() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="s"><v>0</v></c></row>
@@ -846,12 +894,13 @@ final class WorksheetParserTests: XCTestCase {
                                   sharedStrings: ["山田"], styles: ParsedStyleSheet(),
                                   phonetics: ["ヤマダ"])
 
-        XCTAssertEqual(sheet.value(at: CellRef("A1")), .text("山田"))
-        XCTAssertEqual(sheet.phonetics["A1"], "ヤマダ")
+        #expect(sheet.value(at: CellRef("A1")) == .text("山田"))
+        #expect(sheet.phonetics["A1"] == "ヤマダ")
     }
 
     /// A shared string without a reading records nothing, so the map stays empty for the
     /// workbooks that are not Japanese — which is nearly all of them.
+    @Test("No reading records nothing")
     func testNoReadingRecordsNothing() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="s"><v>0</v></c></row>
@@ -861,11 +910,12 @@ final class WorksheetParserTests: XCTestCase {
                                   sharedStrings: ["Hello"], styles: ParsedStyleSheet(),
                                   phonetics: [nil])
 
-        XCTAssertEqual(sheet.value(at: CellRef("A1")), .text("Hello"))
-        XCTAssertTrue(sheet.phonetics.isEmpty)
+        #expect(sheet.value(at: CellRef("A1")) == .text("Hello"))
+        #expect(sheet.phonetics.isEmpty)
     }
 
     /// And the provider surfaces it, which is what SwiftExcelFunctions will call.
+    @Test("Provider surfaces the reading")
     func testProviderSurfacesTheReading() throws {
         let data = makeWorksheetXML(sheetData: """
         <row r="1"><c r="A1" t="s"><v>0</v></c></row>
@@ -877,7 +927,7 @@ final class WorksheetParserTests: XCTestCase {
                                   phonetics: ["ヤマダ"])
 
         let provider = WorkbookValueProvider(workbook: workbook, currentSheet: "Sheet1")
-        XCTAssertEqual(provider.phonetic(at: CellRef("A1")), "ヤマダ")
-        XCTAssertNil(provider.phonetic(at: CellRef("B2")))
+        #expect(provider.phonetic(at: CellRef("A1")) == "ヤマダ")
+        #expect(provider.phonetic(at: CellRef("B2")) == nil)
     }
 }

@@ -1,4 +1,5 @@
-import XCTest
+import Testing
+import Foundation
 import SwiftExcelCore
 @testable import SwiftXLSX
 
@@ -12,7 +13,8 @@ import SwiftExcelCore
 /// These tests are what licenses the design. A name is held **once** — the target is its
 /// meaning — and the refers-to text is reconstructed from it rather than copied, so every
 /// rule the writer applies has to be right. Each test below is one rule with its evidence.
-final class DefinedNameRoundTripTests: XCTestCase {
+@Suite
+struct DefinedNameRoundTripTests {
 
     // MARK: - Reading
 
@@ -21,6 +23,7 @@ final class DefinedNameRoundTripTests: XCTestCase {
     /// `isReference` wanted a letter *and* a digit in each half, so `$D` failed and
     /// `amounts = Expenditures!$D:$D` became a text constant — which is why
     /// `SUMIFS(amounts, …)` answered zero across 1,058 cells in one corpus workbook.
+    @Test("A whole column reads")
     func testAWholeColumnReads() throws {
         let target = DefinedNameResolver.namedRange(
             from: DefinedNameInfo(name: "amounts", formula: "Expenditures!$D:$D",
@@ -28,16 +31,18 @@ final class DefinedNameRoundTripTests: XCTestCase {
             sheets: [])?.reference
 
         guard case .sheetRange(let reference)? = target else {
-            return XCTFail("expected a sheet range, got \(String(describing: target))")
+            Issue.record("expected a sheet range, got \(String(describing: target))")
+            return
         }
-        XCTAssertEqual(reference.sheetName, "Expenditures")
-        XCTAssertEqual(reference.range.start.column, 4)
-        XCTAssertEqual(reference.range.start.row, 1)
-        XCTAssertEqual(reference.range.end.row, CellRef.lastOnSheet.row)
-        XCTAssertTrue(reference.range.start.absoluteColumn, "the $ is part of what was written")
+        #expect(reference.sheetName == "Expenditures")
+        #expect(reference.range.start.column == 4)
+        #expect(reference.range.start.row == 1)
+        #expect(reference.range.end.row == CellRef.lastOnSheet.row)
+        #expect(reference.range.start.absoluteColumn, "the $ is part of what was written")
     }
 
     /// A whole row, likewise.
+    @Test("A whole row reads")
     func testAWholeRowReads() throws {
         let target = DefinedNameResolver.namedRange(
             from: DefinedNameInfo(name: "header", formula: "Sheet1!$3:$3",
@@ -45,13 +50,15 @@ final class DefinedNameRoundTripTests: XCTestCase {
             sheets: [])?.reference
 
         guard case .sheetRange(let reference)? = target else {
-            return XCTFail("expected a sheet range")
+            Issue.record("expected a sheet range")
+            return
         }
-        XCTAssertEqual(reference.range.start.row, 3)
-        XCTAssertEqual(reference.range.end.column, CellRef.lastOnSheet.column)
+        #expect(reference.range.start.row == 3)
+        #expect(reference.range.end.column == CellRef.lastOnSheet.column)
     }
 
     /// What cannot be read says so, rather than posing as a text constant.
+    @Test("What cannot be read is unparsed")
     func testWhatCannotBeReadIsUnparsed() throws {
         for formula in ["_xlfn.LAMBDA(_xlpm.x,_xlpm.x+1)",
                         "OFFSET(Sheet1!$A$1,0,0,COUNTA(Sheet1!$A:$A),1)"] {
@@ -60,9 +67,10 @@ final class DefinedNameRoundTripTests: XCTestCase {
                                       isHidden: false, attributes: [:]),
                 sheets: [])?.reference
             guard case .unparsed(let kept)? = target else {
-                return XCTFail("expected .unparsed for \(formula)")
+                Issue.record("expected .unparsed for \(formula)")
+                return
             }
-            XCTAssertEqual(kept, formula)
+            #expect(kept == formula)
         }
     }
 
@@ -72,6 +80,7 @@ final class DefinedNameRoundTripTests: XCTestCase {
     ///
     /// These are the promises the design makes. A shape not in this list is one the reader
     /// should leave `.unparsed`, where the round trip is the identity and no rule applies.
+    @Test("Every promised shape round trips exactly")
     func testEveryPromisedShapeRoundTripsExactly() throws {
         let shapes = [
             "Definitions!$B$53",
@@ -87,9 +96,10 @@ final class DefinedNameRoundTripTests: XCTestCase {
                 from: DefinedNameInfo(name: "n", formula: formula, localSheetId: nil,
                                       isHidden: false, attributes: [:]),
                 sheets: []) else {
-                return XCTFail("did not read \(formula)")
+                Issue.record("did not read \(formula)")
+                return
             }
-            XCTAssertEqual(DefinedNameWriter.refersTo(name.reference), formula, formula)
+            #expect(DefinedNameWriter.refersTo(name.reference) == formula, "\(formula)")
         }
     }
 
@@ -97,29 +107,31 @@ final class DefinedNameRoundTripTests: XCTestCase {
     ///
     /// The one rule here that is a judgement rather than a fact about the data: quoting a
     /// name that needs no quotes is accepted by Excel and is still not what the file said.
+    @Test("Sheet names are quoted only when they must be")
     func testSheetNamesAreQuotedOnlyWhenTheyMustBe() {
-        XCTAssertFalse(DefinedNameWriter.needsQuoting("Definitions"))
-        XCTAssertFalse(DefinedNameWriter.needsQuoting("Sheet_1"))
-        XCTAssertFalse(DefinedNameWriter.needsQuoting("Q3"))
-        XCTAssertTrue(DefinedNameWriter.needsQuoting("2018 - Sorted by Area"))
-        XCTAssertTrue(DefinedNameWriter.needsQuoting("P&L"))
-        XCTAssertTrue(DefinedNameWriter.needsQuoting("3M"), "a leading digit needs quoting")
-        XCTAssertTrue(DefinedNameWriter.needsQuoting(""))
+        #expect(!(DefinedNameWriter.needsQuoting("Definitions")))
+        #expect(!(DefinedNameWriter.needsQuoting("Sheet_1")))
+        #expect(!(DefinedNameWriter.needsQuoting("Q3")))
+        #expect(DefinedNameWriter.needsQuoting("2018 - Sorted by Area"))
+        #expect(DefinedNameWriter.needsQuoting("P&L"))
+        #expect(DefinedNameWriter.needsQuoting("3M"), "a leading digit needs quoting")
+        #expect(DefinedNameWriter.needsQuoting(""))
     }
 
     /// A full span is written short, because the expansion is visible to the user.
     ///
     /// `D1:D1048576` selects the same cells as `$D:$D` and reads as a mistake in the Name
     /// Manager.
+    @Test("A full span is written in its short form")
     func testAFullSpanIsWrittenInItsShortForm() {
         let column = NamedRangeTarget.range(CellRange(
             from: CellRef(column: 4, row: 1, absoluteColumn: true, absoluteRow: false),
             to: CellRef(column: 4, row: CellRef.lastOnSheet.row,
                         absoluteColumn: true, absoluteRow: false)))
-        XCTAssertEqual(DefinedNameWriter.refersTo(column), "$D:$D")
+        #expect(DefinedNameWriter.refersTo(column) == "$D:$D")
 
         let ordinary = NamedRangeTarget.range(CellRange(from: CellRef("$B$2"), to: CellRef("$C$9")))
-        XCTAssertEqual(DefinedNameWriter.refersTo(ordinary), "$B$2:$C$9")
+        #expect(DefinedNameWriter.refersTo(ordinary) == "$B$2:$C$9")
     }
 
     /// A span covering the whole sheet is two short forms at once, and the `$`s say which.
@@ -137,21 +149,23 @@ final class DefinedNameRoundTripTests: XCTestCase {
     /// select the same ones. It is recoverable from the markers: `$1:$1048576` has absolute
     /// rows and relative columns, and `$A:$XFD` is the other way round. So the ambiguity is
     /// resolved by the half that carries a `$`, which is evidence rather than preference.
+    @Test("A whole sheet span keeps the form it was written in")
     func testAWholeSheetSpanKeepsTheFormItWasWrittenIn() {
         let everyRow = NamedRangeTarget.range(CellRange(
             from: CellRef(column: 1, row: 1, absoluteColumn: false, absoluteRow: true),
             to: CellRef(column: CellRef.lastOnSheet.column, row: CellRef.lastOnSheet.row,
                         absoluteColumn: false, absoluteRow: true)))
-        XCTAssertEqual(DefinedNameWriter.refersTo(everyRow), "$1:$1048576")
+        #expect(DefinedNameWriter.refersTo(everyRow) == "$1:$1048576")
 
         let everyColumn = NamedRangeTarget.range(CellRange(
             from: CellRef(column: 1, row: 1, absoluteColumn: true, absoluteRow: false),
             to: CellRef(column: CellRef.lastOnSheet.column, row: CellRef.lastOnSheet.row,
                         absoluteColumn: true, absoluteRow: false)))
-        XCTAssertEqual(DefinedNameWriter.refersTo(everyColumn), "$A:$XFD")
+        #expect(DefinedNameWriter.refersTo(everyColumn) == "$A:$XFD")
     }
 
     /// The name that found it, read and written as the file has it.
+    @Test("The external link name from the corpus round trips")
     func testTheExternalLinkNameFromTheCorpusRoundTrips() throws {
         for formula in ["[1]AVP!$1:$1048576",
                         "'[2]LBO Sources and Uses'!$1:$1048576"] {
@@ -159,15 +173,17 @@ final class DefinedNameRoundTripTests: XCTestCase {
                 from: DefinedNameInfo(name: "_bdm.x.edm", formula: formula, localSheetId: nil,
                                       isHidden: true, attributes: [:]),
                 sheets: []) else {
-                return XCTFail("did not read \(formula)")
+                Issue.record("did not read \(formula)")
+                return
             }
-            XCTAssertEqual(DefinedNameWriter.refersTo(name.reference), formula)
+            #expect(DefinedNameWriter.refersTo(name.reference) == formula)
         }
     }
 
     // MARK: - Through a file
 
     /// The whole path: define, save, read back.
+    @Test("Names survive A file")
     func testNamesSurviveAFile() throws {
         let workbook = Workbook()
         let definitions = workbook.addSheet(name: "Definitions")
@@ -187,24 +203,24 @@ final class DefinedNameRoundTripTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let reread = try Workbook(contentsOf: url)
-        XCTAssertEqual(reread.namedRanges.all.count, 4)
+        #expect(reread.namedRanges.all.count == 4)
 
-        XCTAssertEqual(DefinedNameWriter.refersTo(
-            try XCTUnwrap(reread.namedRanges.resolve("taxRate"))), "Definitions!$C$8")
-        XCTAssertEqual(DefinedNameWriter.refersTo(
-            try XCTUnwrap(reread.namedRanges.resolve("amounts"))), "Expenditures!$D:$D")
-        XCTAssertEqual(DefinedNameWriter.refersTo(
-            try XCTUnwrap(reread.namedRanges.resolve("normal"))),
-            "_xlfn.LAMBDA(_xlpm.x,_xlpm.x+1)")
+        #expect(DefinedNameWriter.refersTo(
+            try #require(reread.namedRanges.resolve("taxRate"))) == "Definitions!$C$8")
+        #expect(DefinedNameWriter.refersTo(
+            try #require(reread.namedRanges.resolve("amounts"))) == "Expenditures!$D:$D")
+        #expect(DefinedNameWriter.refersTo(
+            try #require(reread.namedRanges.resolve("normal"))) == "_xlfn.LAMBDA(_xlpm.x,_xlpm.x+1)")
 
         // The hidden one, which is 46% of the corpus and the easiest thing to lose.
-        let filter = try XCTUnwrap(
+        let filter = try #require(
             reread.namedRanges.all.first { $0.name == "_xlnm._FilterDatabase" })
-        XCTAssertTrue(filter.isHidden, "a hidden name must come back hidden")
-        XCTAssertEqual(filter.scope, .sheet("Expenditures"))
+        #expect(filter.isHidden, "a hidden name must come back hidden")
+        #expect(filter.scope == .sheet("Expenditures"))
     }
 
     /// Writing a workbook twice gives the same bytes, or a round trip cannot be diffed.
+    @Test("The output is stable")
     func testTheOutputIsStable() throws {
         func build() throws -> Data {
             let workbook = Workbook()
@@ -214,11 +230,14 @@ final class DefinedNameRoundTripTests: XCTestCase {
                             attributes: ["description": "one", "comment": "first"])
             return try workbook.save()
         }
-        XCTAssertEqual(try build(), try build())
+        let first = try build()
+        let second = try build()
+        #expect(first == second)
     }
 
     /// A workbook with no names writes no element at all.
+    @Test("No names means no element")
     func testNoNamesMeansNoElement() {
-        XCTAssertEqual(DefinedNameWriter.element(for: [], sheets: []), "")
+        #expect(DefinedNameWriter.element(for: [], sheets: []) == "")
     }
 }

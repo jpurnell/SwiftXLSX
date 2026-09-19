@@ -1,9 +1,10 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 import SwiftZIP
-import Foundation
 
-final class WorkbookReaderTests: XCTestCase {
+@Suite
+struct WorkbookReaderTests {
 
     // MARK: - Helpers
 
@@ -15,6 +16,7 @@ final class WorkbookReaderTests: XCTestCase {
 
     // MARK: - Basic Reading
 
+    @Test("Read single sheet single cell")
     func testReadSingleSheetSingleCell() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Data")
@@ -22,11 +24,12 @@ final class WorkbookReaderTests: XCTestCase {
 
         let result = try roundTrip(wb)
 
-        XCTAssertEqual(result.sheets.count, 1)
-        XCTAssertEqual(result.sheets[0].name, "Data")
-        XCTAssertEqual(result.sheets[0].cell(at: "A1"), .text("Hello"))
+        #expect(result.sheets.count == 1)
+        #expect(result.sheets[0].name == "Data")
+        #expect(result.sheets[0].cell(at: "A1") == .text("Hello"))
     }
 
+    @Test("Read multiple sheets")
     func testReadMultipleSheets() throws {
         let wb = Workbook()
         _ = wb.addSheet(name: "Inputs")
@@ -35,25 +38,27 @@ final class WorkbookReaderTests: XCTestCase {
 
         let result = try roundTrip(wb)
 
-        XCTAssertEqual(result.sheets.count, 3)
-        XCTAssertEqual(result.sheets[0].name, "Inputs")
-        XCTAssertEqual(result.sheets[1].name, "Calculations")
-        XCTAssertEqual(result.sheets[2].name, "Results")
+        #expect(result.sheets.count == 3)
+        #expect(result.sheets[0].name == "Inputs")
+        #expect(result.sheets[1].name == "Calculations")
+        #expect(result.sheets[2].name == "Results")
     }
 
+    @Test("Read empty sheet")
     func testReadEmptySheet() throws {
         let wb = Workbook()
         _ = wb.addSheet(name: "Empty")
 
         let result = try roundTrip(wb)
 
-        XCTAssertEqual(result.sheets.count, 1)
-        XCTAssertEqual(result.sheets[0].name, "Empty")
-        XCTAssertNil(result.sheets[0].cell(at: "A1"))
+        #expect(result.sheets.count == 1)
+        #expect(result.sheets[0].name == "Empty")
+        #expect(result.sheets[0].cell(at: "A1") == nil)
     }
 
     // MARK: - Cell Types
 
+    @Test("Read text cells")
     func testReadTextCells() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Text")
@@ -64,11 +69,12 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.cell(at: "A1"), .text("Revenue"))
-        XCTAssertEqual(s.cell(at: "A2"), .text("Expenses"))
-        XCTAssertEqual(s.cell(at: "A3"), .text("Profit"))
+        #expect(s.cell(at: "A1") == .text("Revenue"))
+        #expect(s.cell(at: "A2") == .text("Expenses"))
+        #expect(s.cell(at: "A3") == .text("Profit"))
     }
 
+    @Test("Read number cells")
     func testReadNumberCells() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Numbers")
@@ -79,11 +85,12 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.cell(at: "B1"), .number(1_950_000))
-        XCTAssertEqual(s.cell(at: "B2"), .number(42.5))
-        XCTAssertEqual(s.cell(at: "B3"), .number(0))
+        #expect(s.cell(at: "B1") == .number(1_950_000))
+        #expect(s.cell(at: "B2") == .number(42.5))
+        #expect(s.cell(at: "B3") == .number(0))
     }
 
+    @Test("Read formula cells")
     func testReadFormulaCells() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Formulas")
@@ -96,18 +103,19 @@ final class WorkbookReaderTests: XCTestCase {
 
         // Verify formulas were read back
         guard let b2 = s.cell(at: "B2") else {
-            XCTFail("B2 should have a value")
+            Issue.record("B2 should have a value")
             return
         }
-        XCTAssertTrue(b2.isFormula, "B2 should be a formula")
+        #expect(b2.isFormula, "B2 should be a formula")
 
         guard let b3 = s.cell(at: "B3") else {
-            XCTFail("B3 should have a value")
+            Issue.record("B3 should have a value")
             return
         }
-        XCTAssertTrue(b3.isFormula, "B3 should be a formula")
+        #expect(b3.isFormula, "B3 should be a formula")
     }
 
+    @Test("Read boolean cells")
     func testReadBooleanCells() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Bools")
@@ -118,10 +126,11 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.cell(at: "A1"), .bool(true))
-        XCTAssertEqual(s.cell(at: "A2"), .bool(false))
+        #expect(s.cell(at: "A1") == .bool(true))
+        #expect(s.cell(at: "A2") == .bool(false))
     }
 
+    @Test("Read mixed cell types")
     func testReadMixedCellTypes() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Mixed")
@@ -133,18 +142,19 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.cell(at: "A1"), .text("Label"))
-        XCTAssertEqual(s.cell(at: "B1"), .number(42))
+        #expect(s.cell(at: "A1") == .text("Label"))
+        #expect(s.cell(at: "B1") == .number(42))
         if let c1 = s.cell(at: "C1") {
-            XCTAssertTrue(c1.isFormula)
+            #expect(c1.isFormula)
         } else {
-            XCTFail("C1 should have a formula")
+            Issue.record("C1 should have a formula")
         }
-        XCTAssertEqual(s.cell(at: "D1"), .bool(true))
+        #expect(s.cell(at: "D1") == .bool(true))
     }
 
     // MARK: - Styles
 
+    @Test("Read header style bold font")
     func testReadHeaderStyleBoldFont() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Styled")
@@ -154,18 +164,19 @@ final class WorkbookReaderTests: XCTestCase {
         let s = result.sheets[0]
 
         // Verify the cell value
-        XCTAssertEqual(s.cell(at: "A1"), .text("Title"))
+        #expect(s.cell(at: "A1") == .text("Title"))
 
         // Access the cell's style through the internal cells dictionary
         // and verify the font is bold
         let cells = s.cells
         guard let (_, style) = cells["A1"] else {
-            XCTFail("A1 should have a cell entry")
+            Issue.record("A1 should have a cell entry")
             return
         }
-        XCTAssertTrue(style.font.bold, "Header style should have bold font")
+        #expect(style.font.bold, "Header style should have bold font")
     }
 
+    @Test("Read currency style")
     func testReadCurrencyStyle() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Currency")
@@ -174,16 +185,17 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.cell(at: "A1"), .number(1234.56))
+        #expect(s.cell(at: "A1") == .number(1234.56))
 
         let cells = s.cells
         guard let (_, style) = cells["A1"] else {
-            XCTFail("A1 should have a cell entry")
+            Issue.record("A1 should have a cell entry")
             return
         }
-        XCTAssertEqual(style.numberFormat.formatString, "$#,##0.00")
+        #expect(style.numberFormat.formatString == "$#,##0.00")
     }
 
+    @Test("Read custom fill color")
     func testReadCustomFillColor() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Fills")
@@ -195,15 +207,16 @@ final class WorkbookReaderTests: XCTestCase {
 
         let cells = s.cells
         guard let (_, style) = cells["A1"] else {
-            XCTFail("A1 should have a cell entry")
+            Issue.record("A1 should have a cell entry")
             return
         }
-        XCTAssertEqual(style.fill?.patternType, .solid)
-        XCTAssertEqual(style.fill?.foregroundColor, "FFFF0000")
+        #expect(style.fill?.patternType == .solid)
+        #expect(style.fill?.foregroundColor == "FFFF0000")
     }
 
     // MARK: - Layout Features
 
+    @Test("Read freeze panes")
     func testReadFreezePanes() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Frozen")
@@ -213,9 +226,10 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.frozenPaneRef, "A2")
+        #expect(s.frozenPaneRef == "A2")
     }
 
+    @Test("Read auto filter")
     func testReadAutoFilter() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Filtered")
@@ -226,10 +240,12 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertNotNil(s.autoFilterRange)
-        XCTAssertEqual(s.autoFilterRange?.reference, "A1:B10")
+        let filter = try #require(s.autoFilterRange)
+        #expect(filter == CellRange("A1:B10"))
+        #expect(filter.reference == "A1:B10")
     }
 
+    @Test("Read merge cells")
     func testReadMergeCells() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Merged")
@@ -239,10 +255,11 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.mergedCells.count, 1)
-        XCTAssertEqual(s.mergedCells[0].reference, "A1:C1")
+        #expect(s.mergedCells.count == 1)
+        #expect(s.mergedCells[0].reference == "A1:C1")
     }
 
+    @Test("Read row heights")
     func testReadRowHeights() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Heights")
@@ -252,9 +269,10 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.rowHeights[1], 30)
+        #expect(s.rowHeights[1] == 30)
     }
 
+    @Test("Read data validation list")
     func testReadDataValidationList() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "Validation")
@@ -263,45 +281,50 @@ final class WorkbookReaderTests: XCTestCase {
         let result = try roundTrip(wb)
         let s = result.sheets[0]
 
-        XCTAssertEqual(s.validations.count, 1)
+        #expect(s.validations.count == 1)
         if case .list(let items) = s.validations[0].type {
-            XCTAssertEqual(items, ["Yes", "No", "Maybe"])
+            #expect(items == ["Yes", "No", "Maybe"])
         } else {
-            XCTFail("Expected list validation")
+            Issue.record("Expected list validation")
         }
     }
 
     // MARK: - Error Handling
 
-    func testEmptyDataThrowsZipError() {
-        XCTAssertThrowsError(try Workbook(xlsxData: Data())) { error in
-            guard let xlsxError = error as? XLSXReadError else {
-                XCTFail("Expected XLSXReadError, got \(error)")
-                return
-            }
-            if case .zipError = xlsxError {
-                // Expected
-            } else {
-                XCTFail("Expected .zipError, got \(xlsxError)")
-            }
+    @Test("Empty data throws zip error")
+    func testEmptyDataThrowsZipError() throws {
+        let error = try #require(#expect(throws: (any Error).self) {
+            try Workbook(xlsxData: Data())
+        })
+        guard let xlsxError = error as? XLSXReadError else {
+            Issue.record("Expected XLSXReadError, got \(error)")
+            return
+        }
+        if case .zipError = xlsxError {
+            // Expected
+        } else {
+            Issue.record("Expected .zipError, got \(xlsxError)")
         }
     }
 
-    func testInvalidZipThrowsZipError() {
+    @Test("Invalid zip throws zip error")
+    func testInvalidZipThrowsZipError() throws {
         let garbage = Data("This is not a ZIP file".utf8)
-        XCTAssertThrowsError(try Workbook(xlsxData: garbage)) { error in
-            guard let xlsxError = error as? XLSXReadError else {
-                XCTFail("Expected XLSXReadError, got \(error)")
-                return
-            }
-            if case .zipError = xlsxError {
-                // Expected
-            } else {
-                XCTFail("Expected .zipError, got \(xlsxError)")
-            }
+        let error = try #require(#expect(throws: (any Error).self) {
+            try Workbook(xlsxData: garbage)
+        })
+        guard let xlsxError = error as? XLSXReadError else {
+            Issue.record("Expected XLSXReadError, got \(error)")
+            return
+        }
+        if case .zipError = xlsxError {
+            // Expected
+        } else {
+            Issue.record("Expected .zipError, got \(xlsxError)")
         }
     }
 
+    @Test("Missing workbook XML throws missing part")
     func testMissingWorkbookXMLThrowsMissingPart() throws {
         // Create a valid ZIP but without workbook.xml by using a helper workbook,
         // saving it, then stripping the workbook.xml entry.
@@ -309,16 +332,17 @@ final class WorkbookReaderTests: XCTestCase {
         // A ZIP with only a rels file pointing to a missing workbook.xml should throw.
         let minimalZIP = try buildMinimalZIPWithoutWorkbook()
 
-        XCTAssertThrowsError(try Workbook(xlsxData: minimalZIP)) { error in
-            guard let xlsxError = error as? XLSXReadError else {
-                XCTFail("Expected XLSXReadError, got \(error)")
-                return
-            }
-            if case .missingPart(let part) = xlsxError {
-                XCTAssertEqual(part, "xl/workbook.xml")
-            } else {
-                XCTFail("Expected .missingPart, got \(xlsxError)")
-            }
+        let error = try #require(#expect(throws: (any Error).self) {
+            try Workbook(xlsxData: minimalZIP)
+        })
+        guard let xlsxError = error as? XLSXReadError else {
+            Issue.record("Expected XLSXReadError, got \(error)")
+            return
+        }
+        if case .missingPart(let part) = xlsxError {
+            #expect(part == "xl/workbook.xml")
+        } else {
+            Issue.record("Expected .missingPart, got \(xlsxError)")
         }
     }
 
@@ -338,6 +362,7 @@ final class WorkbookReaderTests: XCTestCase {
 
     // MARK: - Convenience Init
 
+    @Test("Init contents of URL")
     func testInitContentsOfURL() throws {
         let wb = Workbook()
         let sheet = wb.addSheet(name: "URLTest")
@@ -351,14 +376,15 @@ final class WorkbookReaderTests: XCTestCase {
         try wb.save(to: url)
 
         let loaded = try Workbook(contentsOf: url)
-        XCTAssertEqual(loaded.sheets.count, 1)
-        XCTAssertEqual(loaded.sheets[0].name, "URLTest")
-        XCTAssertEqual(loaded.sheets[0].cell(at: "A1"), .text("FromFile"))
-        XCTAssertEqual(loaded.sheets[0].cell(at: "B1"), .number(99))
+        #expect(loaded.sheets.count == 1)
+        #expect(loaded.sheets[0].name == "URLTest")
+        #expect(loaded.sheets[0].cell(at: "A1") == .text("FromFile"))
+        #expect(loaded.sheets[0].cell(at: "B1") == .number(99))
     }
 
     // MARK: - Multi-Cell Round-Trip
 
+    @Test("Round trip multiple cells and sheets")
     func testRoundTripMultipleCellsAndSheets() throws {
         let wb = Workbook()
 
@@ -373,19 +399,19 @@ final class WorkbookReaderTests: XCTestCase {
 
         let result = try roundTrip(wb)
 
-        XCTAssertEqual(result.sheets.count, 2)
+        #expect(result.sheets.count == 2)
 
         let rInputs = result.sheets[0]
-        XCTAssertEqual(rInputs.cell(at: "A1"), .text("Revenue"))
-        XCTAssertEqual(rInputs.cell(at: "B1"), .number(500_000))
-        XCTAssertEqual(rInputs.cell(at: "A2"), .text("Costs"))
-        XCTAssertEqual(rInputs.cell(at: "B2"), .number(350_000))
+        #expect(rInputs.cell(at: "A1") == .text("Revenue"))
+        #expect(rInputs.cell(at: "B1") == .number(500_000))
+        #expect(rInputs.cell(at: "A2") == .text("Costs"))
+        #expect(rInputs.cell(at: "B2") == .number(350_000))
 
         let rCalcs = result.sheets[1]
         guard let formula = rCalcs.cell(at: "A1") else {
-            XCTFail("A1 should have a formula")
+            Issue.record("A1 should have a formula")
             return
         }
-        XCTAssertTrue(formula.isFormula)
+        #expect(formula.isFormula)
     }
 }

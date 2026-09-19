@@ -1,21 +1,25 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
-final class CellStyleTests: XCTestCase {
+@Suite
+struct CellStyleTests {
 
     // MARK: - Default Init
 
+    @Test("Default init")
     func testDefaultInit() {
         let style = CellStyle()
-        XCTAssertEqual(style.font, Font())
-        XCTAssertNil(style.border)
-        XCTAssertNil(style.alignment)
-        XCTAssertEqual(style.numberFormat, .general)
-        XCTAssertNil(style.fill)
+        #expect(style.font == Font())
+        #expect(style.border == nil)
+        #expect(style.alignment == nil)
+        #expect(style.numberFormat == .general)
+        #expect(style.fill == nil)
     }
 
     // MARK: - Custom Init
 
+    @Test("Custom init")
     func testCustomInit() {
         let font = Font(name: "Arial", size: 14, bold: true)
         let border = Border.thin
@@ -23,129 +27,152 @@ final class CellStyleTests: XCTestCase {
         let fill = Fill.solid("FFFF0000")
         let style = CellStyle(font: font, border: border, alignment: alignment,
                               numberFormat: .currency, fill: fill)
-        XCTAssertEqual(style.font, font)
-        XCTAssertEqual(style.border, border)
-        XCTAssertEqual(style.alignment, alignment)
-        XCTAssertEqual(style.numberFormat, .currency)
-        XCTAssertEqual(style.fill, fill)
+        #expect(style.font == font)
+        #expect(style.border == border)
+        #expect(style.alignment == alignment)
+        #expect(style.numberFormat == .currency)
+        #expect(style.fill == fill)
     }
 
     // MARK: - Presets
 
+    @Test("General preset")
     func testGeneralPreset() {
         let style = CellStyle.general
-        XCTAssertEqual(style.font, Font())
-        XCTAssertNil(style.border)
-        XCTAssertEqual(style.numberFormat, .general)
-        XCTAssertNil(style.fill)
+        #expect(style.font == Font())
+        #expect(style.border == nil)
+        #expect(style.numberFormat == .general)
+        #expect(style.fill == nil)
     }
 
+    @Test("Header preset")
     func testHeaderPreset() {
         let style = CellStyle.header
-        XCTAssertTrue(style.font.bold)
-        XCTAssertEqual(style.font.name, "Calibri")
-        XCTAssertEqual(style.font.size, 11)
+        #expect(style.font.bold)
+        #expect(style.font.name == "Calibri")
+        #expect(style.font.size.isEqual(to: 11))
     }
 
+    @Test("Currency preset")
     func testCurrencyPreset() {
-        XCTAssertEqual(CellStyle.currency.numberFormat, .currency)
+        #expect(CellStyle.currency.numberFormat == .currency)
     }
 
+    @Test("Percent preset")
     func testPercentPreset() {
-        XCTAssertEqual(CellStyle.percent.numberFormat, .percent)
+        #expect(CellStyle.percent.numberFormat == .percent)
     }
 
+    @Test("Date preset")
     func testDatePreset() {
-        XCTAssertEqual(CellStyle.date.numberFormat, .date)
+        #expect(CellStyle.date.numberFormat == .date)
     }
 
+    @Test("Integer preset")
     func testIntegerPreset() {
-        XCTAssertEqual(CellStyle.integer.numberFormat, .integer)
+        #expect(CellStyle.integer.numberFormat == .integer)
     }
 
+    @Test("Input preset")
     func testInputPreset() {
-        XCTAssertEqual(CellStyle.input.fill, .solid("FFFFFF00"))
+        #expect(CellStyle.input.fill == .solid("FFFFFF00"))
     }
 
+    @Test("Title preset")
     func testTitlePreset() {
-        XCTAssertEqual(CellStyle.title.font.size, 18)
-        XCTAssertTrue(CellStyle.title.font.bold)
+        #expect(CellStyle.title.font.size.isEqual(to: 18))
+        #expect(CellStyle.title.font.bold)
     }
 
     // MARK: - Builder Pattern
 
+    @Test("With font")
     func testWithFont() {
         let original = CellStyle.general
         let modified = original.with(font: Font(name: "Arial", size: 14))
-        XCTAssertEqual(modified.font.name, "Arial")
-        XCTAssertEqual(modified.font.size, 14)
-        XCTAssertEqual(original.font, Font())
+        #expect(modified.font.name == "Arial")
+        #expect(modified.font.size.isEqual(to: 14))
+        #expect(original.font == Font())
     }
 
+    @Test("With border")
     func testWithBorder() {
         let modified = CellStyle.general.with(border: .thin)
-        XCTAssertEqual(modified.border, .thin)
-        XCTAssertNil(CellStyle.general.border)
+        #expect(modified.border == .thin)
+        #expect(CellStyle.general.border == nil)
     }
 
+    @Test("With alignment")
     func testWithAlignment() {
         let alignment = Alignment(horizontal: .center, vertical: .bottom, wrapText: true)
         let modified = CellStyle.general.with(alignment: alignment)
-        XCTAssertEqual(modified.alignment, alignment)
+        #expect(modified.alignment == alignment)
     }
 
+    @Test("With number format")
     func testWithNumberFormat() {
         let modified = CellStyle.general.with(numberFormat: .currency)
-        XCTAssertEqual(modified.numberFormat, .currency)
+        #expect(modified.numberFormat == .currency)
     }
 
+    @Test("With fill")
     func testWithFill() {
         let modified = CellStyle.general.with(fill: .solid("FFFF0000"))
-        XCTAssertEqual(modified.fill, .solid("FFFF0000"))
+        #expect(modified.fill == .solid("FFFF0000"))
     }
 
+    @Test("With nil border")
     func testWithNilBorder() {
         let styled = CellStyle(border: .thin)
         let cleared = styled.with(border: nil)
-        XCTAssertNil(cleared.border)
+        #expect(cleared.border == nil)
     }
 
+    @Test("With chaining")
     func testWithChaining() {
         let style = CellStyle.general
             .with(font: Font(bold: true))
             .with(border: .bottom)
             .with(numberFormat: .currency)
             .with(fill: .solid("FFFFFF00"))
-        XCTAssertTrue(style.font.bold)
-        XCTAssertEqual(style.border, .bottom)
-        XCTAssertEqual(style.numberFormat, .currency)
-        XCTAssertEqual(style.fill, .solid("FFFFFF00"))
+        #expect(style.font.bold)
+        #expect(style.border == .bottom)
+        #expect(style.numberFormat == .currency)
+        #expect(style.fill == .solid("FFFFFF00"))
     }
 
     // MARK: - Equatable
 
+    @Test("Equatable")
     func testEquatable() {
         let a = CellStyle(font: Font(bold: true), numberFormat: .currency)
         let b = CellStyle(font: Font(bold: true), numberFormat: .currency)
-        XCTAssertEqual(a, b)
+        #expect(a == b)
     }
 
+    @Test("Not equal")
     func testNotEqual() {
-        XCTAssertNotEqual(CellStyle.general, CellStyle.header)
-        XCTAssertNotEqual(CellStyle.currency, CellStyle.percent)
-        XCTAssertNotEqual(CellStyle.general, CellStyle.input)
+        #expect(CellStyle.general != CellStyle.header)
+        #expect(CellStyle.currency != CellStyle.percent)
+        #expect(CellStyle.general != CellStyle.input)
     }
 
     // MARK: - Hashable
 
+    @Test("Hashable")
     func testHashable() {
         let set: Set<CellStyle> = [.general, .header, .general, .currency]
-        XCTAssertEqual(set.count, 3)
+        #expect(set.count == 3)
     }
 
     // MARK: - Sendable
 
-    func testSendable() {
-        let _: any Sendable = CellStyle.general
+    @Test("Sendable")
+    func testSendable() async {
+        let style = CellStyle.general
+        let _: any Sendable = style
+        let received = await Task { style }.value
+        #expect(received == CellStyle.general)
+        #expect(received.numberFormat == .general)
     }
 }

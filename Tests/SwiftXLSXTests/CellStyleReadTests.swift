@@ -1,7 +1,7 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 import SwiftZIP
-import Foundation
 
 /// A cell's presentation survives the read.
 ///
@@ -13,7 +13,8 @@ import Foundation
 /// The format is not decoration. It is often the only statement a workbook makes
 /// about what a number *is*: `0.4` in a cell formatted `0%` is a margin, the same
 /// `0.4` formatted `$#,##0` is money, and the label beside it may say neither.
-final class CellStyleReadTests: XCTestCase {
+@Suite
+struct CellStyleReadTests {
 
     private static let contentTypes = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -79,34 +80,36 @@ final class CellStyleReadTests: XCTestCase {
         return try Workbook(xlsxData: ZIPWriter.write(entries: entries))
     }
 
+    @Test("A built in number format is readable")
     func testABuiltInNumberFormatIsReadable() throws {
-        let sheet = try XCTUnwrap(workbook().sheets.first)
-        XCTAssertEqual(
-            sheet.style(at: "B1")?.numberFormat.formatString, "0%",
-            "numFmtId 9 is Excel's own percent and never appears in numFmts"
-        )
+        let sheet = try #require(workbook().sheets.first)
+        #expect(sheet.style(at: "B1")?.numberFormat.formatString == "0%", "numFmtId 9 is Excel's own percent and never appears in numFmts")
     }
 
+    @Test("A custom number format is readable")
     func testACustomNumberFormatIsReadable() throws {
-        let sheet = try XCTUnwrap(workbook().sheets.first)
-        XCTAssertEqual(sheet.style(at: "C1")?.numberFormat.formatString, "\"$\"#,##0")
+        let sheet = try #require(workbook().sheets.first)
+        #expect(sheet.style(at: "C1")?.numberFormat.formatString == "\"$\"#,##0")
     }
 
+    @Test("An unstyled cell is general")
     func testAnUnstyledCellIsGeneral() throws {
-        let sheet = try XCTUnwrap(workbook().sheets.first)
-        XCTAssertEqual(sheet.style(at: "A1")?.numberFormat, .general)
+        let sheet = try #require(workbook().sheets.first)
+        #expect(sheet.style(at: "A1")?.numberFormat == .general)
     }
 
+    @Test("An empty cell has no style")
     func testAnEmptyCellHasNoStyle() throws {
-        let sheet = try XCTUnwrap(workbook().sheets.first)
-        XCTAssertNil(sheet.style(at: "Z99"), "nothing is there to have one")
+        let sheet = try #require(workbook().sheets.first)
+        #expect(sheet.style(at: "Z99") == nil, "nothing is there to have one")
     }
 
+    @Test("A written cell keeps the style it was given")
     func testAWrittenCellKeepsTheStyleItWasGiven() throws {
         let book = Workbook()
         let sheet = book.addSheet(name: "Model")
         sheet.write(0.4, to: "A1", style: .general.with(numberFormat: .percent))
 
-        XCTAssertEqual(sheet.style(at: "A1")?.numberFormat, .percent)
+        #expect(sheet.style(at: "A1")?.numberFormat == .percent)
     }
 }

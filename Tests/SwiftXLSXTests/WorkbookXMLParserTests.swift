@@ -1,7 +1,9 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
-final class WorkbookXMLParserTests: XCTestCase {
+@Suite
+struct WorkbookXMLParserTests {
 
     // MARK: - Helper
 
@@ -11,6 +13,7 @@ final class WorkbookXMLParserTests: XCTestCase {
 
     // MARK: - Sheet Tests
 
+    @Test("Single sheet")
     func testSingleSheet() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -22,12 +25,13 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.sheets.count, 1)
-        XCTAssertEqual(result.sheets[0].name, "Sheet1")
-        XCTAssertEqual(result.sheets[0].sheetId, 1)
-        XCTAssertEqual(result.sheets[0].rId, "rId1")
+        #expect(result.sheets.count == 1)
+        #expect(result.sheets[0].name == "Sheet1")
+        #expect(result.sheets[0].sheetId == 1)
+        #expect(result.sheets[0].rId == "rId1")
     }
 
+    @Test("Multiple sheets")
     func testMultipleSheets() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -41,18 +45,19 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.sheets.count, 3)
-        XCTAssertEqual(result.sheets[0].name, "Revenue")
-        XCTAssertEqual(result.sheets[0].sheetId, 1)
-        XCTAssertEqual(result.sheets[0].rId, "rId1")
-        XCTAssertEqual(result.sheets[1].name, "Expenses")
-        XCTAssertEqual(result.sheets[1].sheetId, 2)
-        XCTAssertEqual(result.sheets[1].rId, "rId2")
-        XCTAssertEqual(result.sheets[2].name, "Summary")
-        XCTAssertEqual(result.sheets[2].sheetId, 3)
-        XCTAssertEqual(result.sheets[2].rId, "rId3")
+        #expect(result.sheets.count == 3)
+        #expect(result.sheets[0].name == "Revenue")
+        #expect(result.sheets[0].sheetId == 1)
+        #expect(result.sheets[0].rId == "rId1")
+        #expect(result.sheets[1].name == "Expenses")
+        #expect(result.sheets[1].sheetId == 2)
+        #expect(result.sheets[1].rId == "rId2")
+        #expect(result.sheets[2].name == "Summary")
+        #expect(result.sheets[2].sheetId == 3)
+        #expect(result.sheets[2].rId == "rId3")
     }
 
+    @Test("Sheet ordering")
     func testSheetOrdering() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -66,17 +71,18 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.sheets.count, 3)
+        #expect(result.sheets.count == 3)
         // Sheets come back in XML document order regardless of sheetId
-        XCTAssertEqual(result.sheets[0].name, "First")
-        XCTAssertEqual(result.sheets[1].name, "Second")
-        XCTAssertEqual(result.sheets[2].name, "Third")
+        #expect(result.sheets[0].name == "First")
+        #expect(result.sheets[1].name == "Second")
+        #expect(result.sheets[2].name == "Third")
         // sheetIds are preserved as-is
-        XCTAssertEqual(result.sheets[0].sheetId, 5)
-        XCTAssertEqual(result.sheets[1].sheetId, 2)
-        XCTAssertEqual(result.sheets[2].sheetId, 9)
+        #expect(result.sheets[0].sheetId == 5)
+        #expect(result.sheets[1].sheetId == 2)
+        #expect(result.sheets[2].sheetId == 9)
     }
 
+    @Test("No sheets")
     func testNoSheets() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -86,12 +92,13 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertTrue(result.sheets.isEmpty)
-        XCTAssertTrue(result.definedNames.isEmpty)
+        #expect(result.sheets.isEmpty)
+        #expect(result.definedNames.isEmpty)
     }
 
     // MARK: - Defined Names Tests
 
+    @Test("Defined names")
     func testDefinedNames() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -106,11 +113,12 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.definedNames.count, 1)
-        XCTAssertEqual(result.definedNames[0].name, "TaxRate")
-        XCTAssertEqual(result.definedNames[0].formula, "Sheet1!$B$1")
+        #expect(result.definedNames.count == 1)
+        #expect(result.definedNames[0].name == "TaxRate")
+        #expect(result.definedNames[0].formula == "Sheet1!$B$1")
     }
 
+    @Test("Defined name with local sheet id")
     func testDefinedNameWithLocalSheetId() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -125,12 +133,13 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.definedNames.count, 1)
-        XCTAssertEqual(result.definedNames[0].name, "LocalRange")
-        XCTAssertEqual(result.definedNames[0].formula, "Sheet1!$A$1:$C$10")
-        XCTAssertEqual(result.definedNames[0].localSheetId, 0)
+        #expect(result.definedNames.count == 1)
+        #expect(result.definedNames[0].name == "LocalRange")
+        #expect(result.definedNames[0].formula == "Sheet1!$A$1:$C$10")
+        #expect(result.definedNames[0].localSheetId == 0)
     }
 
+    @Test("Defined name without local sheet id")
     func testDefinedNameWithoutLocalSheetId() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -145,11 +154,12 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.definedNames.count, 1)
-        XCTAssertEqual(result.definedNames[0].name, "GlobalRate")
-        XCTAssertNil(result.definedNames[0].localSheetId)
+        #expect(result.definedNames.count == 1)
+        #expect(result.definedNames[0].name == "GlobalRate")
+        #expect(result.definedNames[0].localSheetId == nil)
     }
 
+    @Test("Multiple defined names")
     func testMultipleDefinedNames() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -166,19 +176,20 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.definedNames.count, 3)
-        XCTAssertEqual(result.definedNames[0].name, "TaxRate")
-        XCTAssertEqual(result.definedNames[0].formula, "Sheet1!$B$1")
-        XCTAssertNil(result.definedNames[0].localSheetId)
-        XCTAssertEqual(result.definedNames[1].name, "PrintArea")
-        XCTAssertEqual(result.definedNames[1].formula, "Sheet1!$A$1:$F$20")
-        XCTAssertEqual(result.definedNames[1].localSheetId, 0)
-        XCTAssertEqual(result.definedNames[2].name, "Discount")
-        XCTAssertEqual(result.definedNames[2].formula, "Sheet1!$C$3")
+        #expect(result.definedNames.count == 3)
+        #expect(result.definedNames[0].name == "TaxRate")
+        #expect(result.definedNames[0].formula == "Sheet1!$B$1")
+        #expect(result.definedNames[0].localSheetId == nil)
+        #expect(result.definedNames[1].name == "PrintArea")
+        #expect(result.definedNames[1].formula == "Sheet1!$A$1:$F$20")
+        #expect(result.definedNames[1].localSheetId == 0)
+        #expect(result.definedNames[2].name == "Discount")
+        #expect(result.definedNames[2].formula == "Sheet1!$C$3")
     }
 
     // MARK: - Special Characters
 
+    @Test("Special characters in sheet name")
     func testSpecialCharactersInSheetName() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -191,13 +202,14 @@ final class WorkbookXMLParserTests: XCTestCase {
         </workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.sheets.count, 2)
-        XCTAssertEqual(result.sheets[0].name, "Q1 Sales & Revenue")
-        XCTAssertEqual(result.sheets[1].name, "Year <2025>")
+        #expect(result.sheets.count == 2)
+        #expect(result.sheets[0].name == "Q1 Sales & Revenue")
+        #expect(result.sheets[1].name == "Year <2025>")
     }
 
     // MARK: - Real-World Format
 
+    @Test("Real world format from workbook XML")
     func testRealWorldFormatFromWorkbookXML() throws {
         // This matches the exact format produced by Workbook.workbookXML()
         // (see Sources/SwiftXLSX/Workbook.swift, line ~75)
@@ -213,17 +225,17 @@ final class WorkbookXMLParserTests: XCTestCase {
         </sheets></workbook>
         """
         let result = try WorkbookXMLParser.parse(data: xmlData(xml))
-        XCTAssertEqual(result.sheets.count, 3)
-        XCTAssertEqual(result.sheets[0].name, "Income")
-        XCTAssertEqual(result.sheets[0].sheetId, 1)
-        XCTAssertEqual(result.sheets[0].rId, "rId1")
-        XCTAssertEqual(result.sheets[1].name, "Balance Sheet")
-        XCTAssertEqual(result.sheets[1].sheetId, 2)
-        XCTAssertEqual(result.sheets[1].rId, "rId2")
-        XCTAssertEqual(result.sheets[2].name, "Cash Flow")
-        XCTAssertEqual(result.sheets[2].sheetId, 3)
-        XCTAssertEqual(result.sheets[2].rId, "rId3")
+        #expect(result.sheets.count == 3)
+        #expect(result.sheets[0].name == "Income")
+        #expect(result.sheets[0].sheetId == 1)
+        #expect(result.sheets[0].rId == "rId1")
+        #expect(result.sheets[1].name == "Balance Sheet")
+        #expect(result.sheets[1].sheetId == 2)
+        #expect(result.sheets[1].rId == "rId2")
+        #expect(result.sheets[2].name == "Cash Flow")
+        #expect(result.sheets[2].sheetId == 3)
+        #expect(result.sheets[2].rId == "rId3")
         // No defined names in the generated format
-        XCTAssertTrue(result.definedNames.isEmpty)
+        #expect(result.definedNames.isEmpty)
     }
 }

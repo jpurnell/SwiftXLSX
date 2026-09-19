@@ -1,79 +1,97 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
-final class NumberFormatTests: XCTestCase {
+@Suite
+struct NumberFormatTests {
 
     // MARK: - Custom Init
 
+    @Test("Custom init stores format string")
     func testCustomInitStoresFormatString() {
         let format = NumberFormat(formatString: "0.000")
-        XCTAssertEqual(format.formatString, "0.000")
+        #expect(format.formatString == "0.000")
     }
 
+    @Test("Custom init with conditional format")
     func testCustomInitWithConditionalFormat() {
         let format = NumberFormat(formatString: "#,##0.00;[Red]-#,##0.00")
-        XCTAssertEqual(format.formatString, "#,##0.00;[Red]-#,##0.00")
+        #expect(format.formatString == "#,##0.00;[Red]-#,##0.00")
     }
 
     // MARK: - Presets
 
+    @Test("General preset")
     func testGeneralPreset() {
-        XCTAssertEqual(NumberFormat.general.formatString, "General")
+        #expect(NumberFormat.general.formatString == "General")
     }
 
+    @Test("Currency preset")
     func testCurrencyPreset() {
-        XCTAssertEqual(NumberFormat.currency.formatString, "$#,##0.00")
+        #expect(NumberFormat.currency.formatString == "$#,##0.00")
     }
 
+    @Test("Percent preset")
     func testPercentPreset() {
-        XCTAssertEqual(NumberFormat.percent.formatString, "0.00%")
+        #expect(NumberFormat.percent.formatString == "0.00%")
     }
 
+    @Test("Date preset")
     func testDatePreset() {
-        XCTAssertEqual(NumberFormat.date.formatString, "mm/dd/yyyy")
+        #expect(NumberFormat.date.formatString == "mm/dd/yyyy")
     }
 
+    @Test("Integer preset")
     func testIntegerPreset() {
-        XCTAssertEqual(NumberFormat.integer.formatString, "#,##0")
+        #expect(NumberFormat.integer.formatString == "#,##0")
     }
 
+    @Test("Accounting preset")
     func testAccountingPreset() {
-        XCTAssertEqual(NumberFormat.accounting.formatString, "_($* #,##0.00_)")
+        #expect(NumberFormat.accounting.formatString == "_($* #,##0.00_)")
     }
 
     // MARK: - Equatable
 
+    @Test("Equal formats are equal")
     func testEqualFormatsAreEqual() {
         let a = NumberFormat(formatString: "0.00%")
         let b = NumberFormat(formatString: "0.00%")
-        XCTAssertEqual(a, b)
+        #expect(a == b)
     }
 
+    @Test("Different formats are not equal")
     func testDifferentFormatsAreNotEqual() {
         let a = NumberFormat(formatString: "0.00%")
         let b = NumberFormat(formatString: "#,##0")
-        XCTAssertNotEqual(a, b)
+        #expect(a != b)
     }
 
     // MARK: - Hashable
 
+    @Test("Set deduplication")
     func testSetDeduplication() {
         let a = NumberFormat(formatString: "#,##0.00")
         let b = NumberFormat(formatString: "#,##0.00")
         let set: Set<NumberFormat> = [a, b]
-        XCTAssertEqual(set.count, 1)
+        #expect(set.count == 1)
     }
 
+    @Test("Dictionary key")
     func testDictionaryKey() {
         let format = NumberFormat(formatString: "mm/dd/yyyy")
         let dict: [NumberFormat: Int] = [format: 14]
-        XCTAssertEqual(dict[format], 14)
+        #expect(dict[format] == 14)
     }
 
     // MARK: - Sendable
 
-    func testSendableConformance() {
+    @Test("Sendable conformance")
+    func testSendableConformance() async {
         let format = NumberFormat.general
         let _: any Sendable = format
+        let received = await Task { format }.value
+        #expect(received == NumberFormat.general)
+        #expect(received.formatString == "General")
     }
 }

@@ -1,51 +1,61 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
-final class DesignBundleTests: XCTestCase {
+@Suite
+struct DesignBundleTests {
 
+    @Test("Default body font")
     func testDefaultBodyFont() {
         let bundle = DesignBundle.default
-        XCTAssertEqual(bundle.bodyFont.name, "SF Mono")
-        XCTAssertEqual(bundle.bodyFont.size, 11)
-        XCTAssertFalse(bundle.bodyFont.bold)
+        #expect(bundle.bodyFont.name == "SF Mono")
+        #expect(bundle.bodyFont.size.isEqual(to: 11))
+        #expect(!(bundle.bodyFont.bold))
     }
 
+    @Test("Default title font")
     func testDefaultTitleFont() {
         let bundle = DesignBundle.default
-        XCTAssertEqual(bundle.titleFont.name, "SF Pro Display")
-        XCTAssertEqual(bundle.titleFont.size, 18)
-        XCTAssertTrue(bundle.titleFont.bold)
+        #expect(bundle.titleFont.name == "SF Pro Display")
+        #expect(bundle.titleFont.size.isEqual(to: 18))
+        #expect(bundle.titleFont.bold)
     }
 
+    @Test("Default label font")
     func testDefaultLabelFont() {
         let bundle = DesignBundle.default
-        XCTAssertEqual(bundle.labelFont.name, "SF Mono")
-        XCTAssertEqual(bundle.labelFont.size, 11)
-        XCTAssertTrue(bundle.labelFont.bold)
+        #expect(bundle.labelFont.name == "SF Mono")
+        #expect(bundle.labelFont.size.isEqual(to: 11))
+        #expect(bundle.labelFont.bold)
     }
 
+    @Test("Default gutter columns")
     func testDefaultGutterColumns() {
         let bundle = DesignBundle.default
-        XCTAssertEqual(bundle.gutterColumnCount, 2)
-        XCTAssertEqual(bundle.gutterColumnWidth, 2.85)
+        #expect(bundle.gutterColumnCount == 2)
+        #expect(bundle.gutterColumnWidth.isEqual(to: 2.85))
     }
 
+    @Test("Default data column width")
     func testDefaultDataColumnWidth() {
-        XCTAssertEqual(DesignBundle.default.dataColumnWidth, 14.28)
+        #expect(DesignBundle.default.dataColumnWidth.isEqual(to: 14.28))
     }
 
+    @Test("Default title row height")
     func testDefaultTitleRowHeight() {
-        XCTAssertEqual(DesignBundle.default.titleRowHeight, 40.0)
+        #expect(DesignBundle.default.titleRowHeight.isEqual(to: 40.0))
     }
 
+    @Test("Default sheet names")
     func testDefaultSheetNames() {
         let names = DesignBundle.default.defaultSheetNames
-        XCTAssertEqual(names.count, 9)
-        XCTAssertEqual(names.first, "Definitions")
-        XCTAssertEqual(names[1], "Sheet 1")
-        XCTAssertEqual(names.last, "Sheet 8")
+        #expect(names.count == 9)
+        #expect(names.first == "Definitions")
+        #expect(names[1] == "Sheet 1")
+        #expect(names.last == "Sheet 8")
     }
 
+    @Test("Custom bundle")
     func testCustomBundle() {
         let bundle = DesignBundle(
             bodyFont: Font(name: "Courier", size: 12),
@@ -57,18 +67,24 @@ final class DesignBundleTests: XCTestCase {
             titleRowHeight: 30.0,
             defaultSheetNames: ["Data", "Summary"]
         )
-        XCTAssertEqual(bundle.bodyFont.name, "Courier")
-        XCTAssertEqual(bundle.gutterColumnCount, 1)
-        XCTAssertEqual(bundle.defaultSheetNames.count, 2)
+        #expect(bundle.bodyFont.name == "Courier")
+        #expect(bundle.gutterColumnCount == 1)
+        #expect(bundle.defaultSheetNames.count == 2)
     }
 
+    @Test("Equatable")
     func testEquatable() {
-        XCTAssertEqual(DesignBundle.default, DesignBundle.default)
+        #expect(DesignBundle.default == DesignBundle.default)
         let custom = DesignBundle(gutterColumnCount: 3)
-        XCTAssertNotEqual(custom, .default)
+        #expect(custom != .default)
     }
 
-    func testSendable() {
-        let _: any Sendable = DesignBundle.default
+    @Test("Sendable")
+    func testSendable() async {
+        let bundle = DesignBundle.default
+        let _: any Sendable = bundle
+        let received = await Task { bundle }.value
+        #expect(received == DesignBundle.default)
+        #expect(received.gutterColumnCount == 2)
     }
 }

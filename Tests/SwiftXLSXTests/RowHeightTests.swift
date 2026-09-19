@@ -1,62 +1,71 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
-final class RowHeightTests: XCTestCase {
-    func testDefaultRowHeightsIsEmpty() {
+@Suite
+struct RowHeightTests {
+    @Test("Default row heights is empty")
+    func testDefaultRowHeightsIsEmpty() throws {
         let wb = Workbook()
         let ws = wb.addSheet(name: "Sheet1")
-        XCTAssertTrue(ws.rowHeights.isEmpty)
+        #expect(ws.rowHeights.isEmpty)
     }
 
-    func testSetRowHeightStoresHeight() {
+    @Test("Set row height stores height")
+    func testSetRowHeightStoresHeight() throws {
         let wb = Workbook()
         let ws = wb.addSheet(name: "Sheet1")
         ws.setRowHeight(row: 1, height: 25.0)
-        XCTAssertEqual(ws.rowHeights[1], 25.0)
+        #expect(try #require(ws.rowHeights[1]).isEqual(to: 25.0))
     }
 
-    func testSetMultipleRowHeights() {
+    @Test("Set multiple row heights")
+    func testSetMultipleRowHeights() throws {
         let wb = Workbook()
         let ws = wb.addSheet(name: "Sheet1")
         ws.setRowHeight(row: 1, height: 20.0)
         ws.setRowHeight(row: 2, height: 30.0)
         ws.setRowHeight(row: 5, height: 15.0)
-        XCTAssertEqual(ws.rowHeights.count, 3)
-        XCTAssertEqual(ws.rowHeights[1], 20.0)
-        XCTAssertEqual(ws.rowHeights[2], 30.0)
-        XCTAssertEqual(ws.rowHeights[5], 15.0)
+        #expect(ws.rowHeights.count == 3)
+        #expect(try #require(ws.rowHeights[1]).isEqual(to: 20.0))
+        #expect(try #require(ws.rowHeights[2]).isEqual(to: 30.0))
+        #expect(try #require(ws.rowHeights[5]).isEqual(to: 15.0))
     }
 
-    func testOverwriteRowHeight() {
+    @Test("Overwrite row height")
+    func testOverwriteRowHeight() throws {
         let wb = Workbook()
         let ws = wb.addSheet(name: "Sheet1")
         ws.setRowHeight(row: 3, height: 20.0)
         ws.setRowHeight(row: 3, height: 50.0)
-        XCTAssertEqual(ws.rowHeights[3], 50.0)
-        XCTAssertEqual(ws.rowHeights.count, 1)
+        #expect(try #require(ws.rowHeights[3]).isEqual(to: 50.0))
+        #expect(ws.rowHeights.count == 1)
     }
 
-    func testDifferentRowsAreIndependent() {
+    @Test("Different rows are independent")
+    func testDifferentRowsAreIndependent() throws {
         let wb = Workbook()
         let ws = wb.addSheet(name: "Sheet1")
         ws.setRowHeight(row: 1, height: 10.0)
         ws.setRowHeight(row: 2, height: 99.0)
-        XCTAssertEqual(ws.rowHeights[1], 10.0)
-        XCTAssertEqual(ws.rowHeights[2], 99.0)
-        XCTAssertNotEqual(ws.rowHeights[1], ws.rowHeights[2])
+        #expect(try #require(ws.rowHeights[1]).isEqual(to: 10.0))
+        #expect(try #require(ws.rowHeights[2]).isEqual(to: 99.0))
+        #expect(ws.rowHeights[1] != ws.rowHeights[2])
     }
 
-    func testFractionalHeightPreservedExactly() {
+    @Test("Fractional height preserved exactly")
+    func testFractionalHeightPreservedExactly() throws {
         let wb = Workbook()
         let ws = wb.addSheet(name: "Sheet1")
         ws.setRowHeight(row: 7, height: 40.5)
-        XCTAssertEqual(ws.rowHeights[7], 40.5)
+        #expect(try #require(ws.rowHeights[7]).isEqual(to: 40.5))
     }
 
-    func testUnsetRowReturnsNil() {
+    @Test("Unset row returns nil")
+    func testUnsetRowReturnsNil() throws {
         let wb = Workbook()
         let ws = wb.addSheet(name: "Sheet1")
         ws.setRowHeight(row: 1, height: 20.0)
-        XCTAssertNil(ws.rowHeights[999])
+        #expect(ws.rowHeights[999] == nil)
     }
 }

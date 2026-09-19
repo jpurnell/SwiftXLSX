@@ -1,4 +1,5 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
 /// Writing a formula together with the value Excel last computed for it.
@@ -12,38 +13,44 @@ import XCTest
 /// data table, whose body is entirely cached numbers under one marker; a formula
 /// whose cached value is the only evidence of what it produced — had no way to
 /// construct a fixture without a real file.
-final class CachedFormulaWriteTests: XCTestCase {
+@Suite
+struct CachedFormulaWriteTests {
 
+    @Test("A formula can carry its cached value")
     func testAFormulaCanCarryItsCachedValue() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Model")
         sheet.write(FormulaAST.multiply(.cellRef(CellRef("A1")), .number(2)), to: "B1",
                     cached: .number(84))
 
-        let value = try XCTUnwrap(sheet.cell(at: "B1"))
+        let value = try #require(sheet.cell(at: "B1"))
         guard case .formula(let ast, let cached) = value else {
-            return XCTFail("expected a formula, got \(value)")
+            Issue.record("expected a formula, got \(value)")
+            return
         }
-        XCTAssertEqual(ast, .multiply(.cellRef(CellRef("A1")), .number(2)))
-        XCTAssertEqual(cached, .number(84))
+        #expect(ast == .multiply(.cellRef(CellRef("A1")), .number(2)))
+        #expect(cached == .number(84))
     }
 
+    @Test("The formula is still reachable as one")
     func testTheFormulaIsStillReachableAsOne() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Model")
         sheet.write(FormulaAST.number(1), to: "B1", cached: .number(1))
 
-        XCTAssertEqual(sheet.formulaAST(at: "B1"), .number(1))
+        #expect(sheet.formulaAST(at: "B1") == .number(1))
     }
 
+    @Test("Omitting the cached value is unchanged")
     func testOmittingTheCachedValueIsUnchanged() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Model")
         sheet.write(FormulaAST.number(1), to: "B1")
 
         guard case .formula(_, let cached)? = sheet.cell(at: "B1") else {
-            return XCTFail("expected a formula")
+            Issue.record("expected a formula")
+            return
         }
-        XCTAssertNil(cached, "the existing overload keeps its behaviour")
+        #expect(cached == nil, "the existing overload keeps its behaviour")
     }
 }

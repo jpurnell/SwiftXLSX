@@ -1,11 +1,13 @@
-import XCTest
-@testable import SwiftXLSX
+import Testing
 import Foundation
+@testable import SwiftXLSX
 
-final class ContentTypesParserTests: XCTestCase {
+@Suite
+struct ContentTypesParserTests {
 
     // MARK: - Typical Parsing
 
+    @Test("Parse typical content types")
     func testParseTypicalContentTypes() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -16,17 +18,16 @@ final class ContentTypesParserTests: XCTestCase {
         </Types>
         """
         let ct = try ContentTypesParser.parse(data: Data(xml.utf8))
-        XCTAssertEqual(ct.defaults.count, 2)
-        XCTAssertEqual(ct.defaults["rels"],
-                       "application/vnd.openxmlformats-package.relationships+xml")
-        XCTAssertEqual(ct.defaults["xml"], "application/xml")
-        XCTAssertEqual(ct.overrides.count, 1)
-        XCTAssertEqual(ct.overrides["/xl/workbook.xml"],
-                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
+        #expect(ct.defaults.count == 2)
+        #expect(ct.defaults["rels"] == "application/vnd.openxmlformats-package.relationships+xml")
+        #expect(ct.defaults["xml"] == "application/xml")
+        #expect(ct.overrides.count == 1)
+        #expect(ct.overrides["/xl/workbook.xml"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
     }
 
     // MARK: - Edge Cases
 
+    @Test("Empty types")
     func testEmptyTypes() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -34,10 +35,11 @@ final class ContentTypesParserTests: XCTestCase {
         </Types>
         """
         let ct = try ContentTypesParser.parse(data: Data(xml.utf8))
-        XCTAssertTrue(ct.defaults.isEmpty)
-        XCTAssertTrue(ct.overrides.isEmpty)
+        #expect(ct.defaults.isEmpty)
+        #expect(ct.overrides.isEmpty)
     }
 
+    @Test("Defaults only")
     func testDefaultsOnly() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -47,10 +49,11 @@ final class ContentTypesParserTests: XCTestCase {
         </Types>
         """
         let ct = try ContentTypesParser.parse(data: Data(xml.utf8))
-        XCTAssertEqual(ct.defaults.count, 2)
-        XCTAssertTrue(ct.overrides.isEmpty)
+        #expect(ct.defaults.count == 2)
+        #expect(ct.overrides.isEmpty)
     }
 
+    @Test("Overrides only")
     func testOverridesOnly() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -60,12 +63,13 @@ final class ContentTypesParserTests: XCTestCase {
         </Types>
         """
         let ct = try ContentTypesParser.parse(data: Data(xml.utf8))
-        XCTAssertTrue(ct.defaults.isEmpty)
-        XCTAssertEqual(ct.overrides.count, 2)
+        #expect(ct.defaults.isEmpty)
+        #expect(ct.overrides.count == 2)
     }
 
     // MARK: - Real-World Round-Trip
 
+    @Test("Parse swift XLSX content types output")
     func testParseSwiftXLSXContentTypesOutput() throws {
         // This is the XML that SwiftXLSX's Workbook.contentTypesXML() generates
         // for a workbook with 2 sheets
@@ -84,22 +88,16 @@ final class ContentTypesParserTests: XCTestCase {
         let ct = try ContentTypesParser.parse(data: Data(xml.utf8))
 
         // Verify defaults
-        XCTAssertEqual(ct.defaults.count, 2)
-        XCTAssertEqual(ct.defaults["rels"],
-                       "application/vnd.openxmlformats-package.relationships+xml")
-        XCTAssertEqual(ct.defaults["xml"], "application/xml")
+        #expect(ct.defaults.count == 2)
+        #expect(ct.defaults["rels"] == "application/vnd.openxmlformats-package.relationships+xml")
+        #expect(ct.defaults["xml"] == "application/xml")
 
         // Verify overrides
-        XCTAssertEqual(ct.overrides.count, 5)
-        XCTAssertEqual(ct.overrides["/xl/workbook.xml"],
-                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
-        XCTAssertEqual(ct.overrides["/xl/styles.xml"],
-                       "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml")
-        XCTAssertEqual(ct.overrides["/xl/sharedStrings.xml"],
-                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml")
-        XCTAssertEqual(ct.overrides["/xl/worksheets/sheet1.xml"],
-                       "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml")
-        XCTAssertEqual(ct.overrides["/xl/worksheets/sheet2.xml"],
-                       "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml")
+        #expect(ct.overrides.count == 5)
+        #expect(ct.overrides["/xl/workbook.xml"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
+        #expect(ct.overrides["/xl/styles.xml"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml")
+        #expect(ct.overrides["/xl/sharedStrings.xml"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml")
+        #expect(ct.overrides["/xl/worksheets/sheet1.xml"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml")
+        #expect(ct.overrides["/xl/worksheets/sheet2.xml"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml")
     }
 }

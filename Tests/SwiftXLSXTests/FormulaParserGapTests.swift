@@ -1,4 +1,5 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 import SwiftExcelCore
 
@@ -11,7 +12,8 @@ import SwiftExcelCore
 ///
 /// Grouped by cause it is five gaps, not a long tail. Every formula below is
 /// copied from a workbook rather than invented.
-final class FormulaParserGapTests: XCTestCase {
+@Suite
+struct FormulaParserGapTests {
 
     private func parses(_ formula: String) -> Bool {
         (try? FormulaParser.parse(formula)) != nil
@@ -21,40 +23,47 @@ final class FormulaParserGapTests: XCTestCase {
 
     /// `IFERROR(x,)` means "and empty if it errors". Excel allows an argument to
     /// be left out; the comma still marks its place.
+    @Test("Omitted trailing argument")
     func testOmittedTrailingArgument() {
-        XCTAssertTrue(parses("IFERROR(B5/C5-1,)"))
+        #expect(parses("IFERROR(B5/C5-1,)"))
     }
 
     /// `ADDRESS(row, col, 1, , "Sheet")` omits the fourth argument between two
     /// commas, which is the same rule in the middle rather than at the end.
+    @Test("Omitted middle argument")
     func testOmittedMiddleArgument() {
-        XCTAssertTrue(parses("ADDRESS($C27,AZ$3,1,,\"Lease Revenue\")"))
+        #expect(parses("ADDRESS($C27,AZ$3,1,,\"Lease Revenue\")"))
     }
 
     // MARK: - Defined names as operands (~95,000 formulas)
 
+    @Test("Defined name as function argument")
     func testDefinedNameAsFunctionArgument() {
-        XCTAssertTrue(parses("VLOOKUP(\"SS\",Production_Supply, 7, FALSE)"))
+        #expect(parses("VLOOKUP(\"SS\",Production_Supply, 7, FALSE)"))
     }
 
+    @Test("Defined name in arithmetic")
     func testDefinedNameInArithmetic() {
-        XCTAssertTrue(parses("C36+days_per_week"))
+        #expect(parses("C36+days_per_week"))
     }
 
+    @Test("Bare defined name is A whole formula")
     func testBareDefinedNameIsAWholeFormula() {
-        XCTAssertTrue(parses("report_week_end_date"))
+        #expect(parses("report_week_end_date"))
     }
 
     // MARK: - Whole-column and whole-row ranges (~47,000 formulas)
 
     /// `$E:$E` is every cell in column E. A criteria function over a column is
     /// how a spreadsheet says "look at all of it".
+    @Test("Whole column range")
     func testWholeColumnRange() {
-        XCTAssertTrue(parses("SUMIFS(Sheet2!$E:$E,Sheet2!$C:$C,$A$2)"))
+        #expect(parses("SUMIFS(Sheet2!$E:$E,Sheet2!$C:$C,$A$2)"))
     }
 
+    @Test("Whole row range on A quoted sheet")
     func testWholeRowRangeOnAQuotedSheet() {
-        XCTAssertTrue(parses("HLOOKUP(DW$2,'Lease Revenue'!$2:$3,2)+5"))
+        #expect(parses("HLOOKUP(DW$2,'Lease Revenue'!$2:$3,2)+5"))
     }
 
     // MARK: - Prefixed function names (~22,800 formulas)
@@ -62,32 +71,37 @@ final class FormulaParserGapTests: XCTestCase {
     /// `_xll.` marks a function supplied by an add-in — here Frontline's Risk
     /// Solver. `_xlfn.` marks one newer than the file format, which Excel writes
     /// so that older versions fail loudly rather than silently.
+    @Test("Add in prefixed function")
     func testAddInPrefixedFunction() {
-        XCTAssertTrue(parses("_xll.PsiNormal($C$3,$C$4)"))
+        #expect(parses("_xll.PsiNormal($C$3,$C$4)"))
     }
 
+    @Test("Modern function prefix and dotted name")
     func testModernFunctionPrefixAndDottedName() {
-        XCTAssertTrue(parses("_xlfn.COVARIANCE.P($M$5:$M$28,N5:N28)"))
+        #expect(parses("_xlfn.COVARIANCE.P($M$5:$M$28,N5:N28)"))
     }
 
     // MARK: - Percent literals (~60 formulas)
 
     /// `0.25%` is a number with a suffix. Found only after the lexer stopped
     /// failing earlier in these formulas — the fifth gap was hiding the sixth.
+    @Test("Percent literal")
     func testPercentLiteral() {
-        XCTAssertTrue(parses("L4+0.25%"))
+        #expect(parses("L4+0.25%"))
     }
 
     // MARK: - Error literals (233 formulas)
 
     /// A formula can name a cell whose reference broke. The error is the value.
+    @Test("Error literal as A value")
     func testErrorLiteralAsAValue() {
-        XCTAssertTrue(parses("IFERROR(#REF!,0)"))
+        #expect(parses("IFERROR(#REF!,0)"))
     }
 
     /// The sheet is named and the reference on it is broken.
+    @Test("Error literal after A sheet name")
     func testErrorLiteralAfterASheetName() {
-        XCTAssertTrue(parses("CB_DATA_!#REF!"))
+        #expect(parses("CB_DATA_!#REF!"))
     }
 
     // MARK: - Bare column ranges, no dollar (~40 formulas)
@@ -95,31 +109,36 @@ final class FormulaParserGapTests: XCTestCase {
     /// `A:A` is the same range as `$A:$A`. The lexer cannot tell `A` from a
     /// defined name, so the parser decides once it has seen the colon and a
     /// second word that is also a column.
+    @Test("Bare column range on A quoted sheet")
     func testBareColumnRangeOnAQuotedSheet() {
-        XCTAssertTrue(parses("MAX('Paid Cost - Input+Calc'!A:A)"))
+        #expect(parses("MAX('Paid Cost - Input+Calc'!A:A)"))
     }
 
     /// `Comp!1:1` — a whole row without the `$`. A bare number lexes as a number,
     /// so the parser recognises the pair rather than the lexer recognising a half.
+    @Test("Bare row range on A named sheet")
     func testBareRowRangeOnANamedSheet() {
-        XCTAssertTrue(parses("MATCH($A5,Comp!1:1,0)"))
+        #expect(parses("MATCH($A5,Comp!1:1,0)"))
     }
 
+    @Test("A bare word followed by A colon is still A name when it is not A column")
     func testABareWordFollowedByAColonIsStillANameWhenItIsNotAColumn() throws {
         // `days_per_week` is not a column, so nothing here is a range.
-        XCTAssertNotNil(try? FormulaParser.parse("SUM(days_per_week)"))
+        let ast = try FormulaParser.parse("SUM(days_per_week)")
+        #expect(ast == .function("SUM", [.namedRange("days_per_week")]))
     }
 
     // MARK: - Round trip
 
     /// Every form above must survive being written back out, or the parser has
     /// only half solved the problem.
+    @Test("These forms survive A round trip")
     func testTheseFormsSurviveARoundTrip() throws {
         for formula in ["IFERROR(B5/C5-1,)", "SUM($E:$E)", "L4+0.25%", "_xll.PsiNormal(C3,C4)"] {
             let ast = try FormulaParser.parse(formula)
             let written = FormulaSerializer.serialize(ast)
             let reparsed = try FormulaParser.parse(written)
-            XCTAssertEqual(ast, reparsed, "\(formula) → \(written)")
+            #expect(ast == reparsed, "\(formula) → \(written)")
         }
     }
 }

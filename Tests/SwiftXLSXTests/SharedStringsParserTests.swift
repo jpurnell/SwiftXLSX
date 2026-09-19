@@ -1,7 +1,9 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
-final class SharedStringsParserTests: XCTestCase {
+@Suite
+struct SharedStringsParserTests {
 
     // MARK: - Helpers
 
@@ -24,6 +26,7 @@ final class SharedStringsParserTests: XCTestCase {
     /// missing feature but a corrupted value: it is wrong for every function that reads the
     /// cell, not only for `PHONETIC`, and it is invisible to a reader who cannot tell the
     /// two scripts apart.
+    @Test("Phonetic run is not concatenated into the value")
     func testPhoneticRunIsNotConcatenatedIntoTheValue() throws {
         let data = xmlData("""
         <si>\
@@ -33,10 +36,11 @@ final class SharedStringsParserTests: XCTestCase {
         </si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["山田"])
+        #expect(result == ["山田"])
     }
 
     /// Several runs each with their own reading — the value is still only the runs.
+    @Test("Several phonetic runs are all excluded")
     func testSeveralPhoneticRunsAreAllExcluded() throws {
         let data = xmlData("""
         <si>\
@@ -47,18 +51,20 @@ final class SharedStringsParserTests: XCTestCase {
         </si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["山田太郎"])
+        #expect(result == ["山田太郎"])
     }
 
     /// A plain rich-text string with no furigana still concatenates its runs, which is the
     /// behaviour the fix must not disturb.
+    @Test("Ordinary rich text still concatenates")
     func testOrdinaryRichTextStillConcatenates() throws {
         let data = xmlData("<si><r><t>Hello </t></r><r><t>world</t></r></si>")
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["Hello world"])
+        #expect(result == ["Hello world"])
     }
 
     /// The reading is now kept rather than dropped, paired with the value it annotates.
+    @Test("Phonetic is captured alongside the value")
     func testPhoneticIsCapturedAlongsideTheValue() throws {
         let data = xmlData("""
         <si>\
@@ -67,10 +73,11 @@ final class SharedStringsParserTests: XCTestCase {
         </si>
         """)
         let entries = try SharedStringsParser.parseEntries(data: data)
-        XCTAssertEqual(entries, [.init(text: "山田", phonetic: "ヤマダ")])
+        #expect(entries == [.init(text: "山田", phonetic: "ヤマダ")])
     }
 
     /// Several readings for one value concatenate, in document order, as the runs do.
+    @Test("Several readings concatenate")
     func testSeveralReadingsConcatenate() throws {
         let data = xmlData("""
         <si>\
@@ -81,34 +88,38 @@ final class SharedStringsParserTests: XCTestCase {
         </si>
         """)
         let entries = try SharedStringsParser.parseEntries(data: data)
-        XCTAssertEqual(entries, [.init(text: "山田太郎", phonetic: "ヤマダタロウ")])
+        #expect(entries == [.init(text: "山田太郎", phonetic: "ヤマダタロウ")])
     }
 
     /// **No reading is `nil`, not the empty string.** A caller asking for a phonetic wants
     /// to distinguish "this cell has no reading" from "its reading is blank", and every
     /// non-Japanese workbook is the first case.
+    @Test("Absent reading is nil")
     func testAbsentReadingIsNil() throws {
         let entries = try SharedStringsParser.parseEntries(data: xmlData("<si><t>Hello</t></si>"))
-        XCTAssertEqual(entries, [.init(text: "Hello", phonetic: nil)])
+        #expect(entries == [.init(text: "Hello", phonetic: nil)])
     }
 
     // MARK: - 1. Empty data
 
+    @Test("Empty data returns empty array")
     func testEmptyDataReturnsEmptyArray() throws {
         let result = try SharedStringsParser.parse(data: Data())
-        XCTAssertEqual(result, [])
+        #expect(result == [])
     }
 
     // MARK: - 2. Single string
 
+    @Test("Single string")
     func testSingleString() throws {
         let data = xmlData("<si><t>Hello</t></si>")
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["Hello"])
+        #expect(result == ["Hello"])
     }
 
     // MARK: - 3. Multiple strings (order preserved)
 
+    @Test("Multiple strings preserve order")
     func testMultipleStringsPreserveOrder() throws {
         let data = xmlData("""
         <si><t>Alpha</t></si>\
@@ -116,19 +127,21 @@ final class SharedStringsParserTests: XCTestCase {
         <si><t>Gamma</t></si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["Alpha", "Beta", "Gamma"])
+        #expect(result == ["Alpha", "Beta", "Gamma"])
     }
 
     // MARK: - 4. Empty string entry
 
+    @Test("Empty string entry")
     func testEmptyStringEntry() throws {
         let data = xmlData("<si><t></t></si>")
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, [""])
+        #expect(result == [""])
     }
 
     // MARK: - 5. Unicode strings
 
+    @Test("Unicode strings")
     func testUnicodeStrings() throws {
         let data = xmlData("""
         <si><t>caf\u{00E9}</t></si>\
@@ -137,15 +150,16 @@ final class SharedStringsParserTests: XCTestCase {
         <si><t>\u{00FC}\u{00F6}\u{00E4}</t></si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result.count, 4)
-        XCTAssertEqual(result[0], "caf\u{00E9}")   // accented
-        XCTAssertEqual(result[1], "\u{4F60}\u{597D}") // CJK
-        XCTAssertEqual(result[2], "\u{1F600}")       // emoji
-        XCTAssertEqual(result[3], "\u{00FC}\u{00F6}\u{00E4}") // umlauts
+        #expect(result.count == 4)
+        #expect(result[0] == "caf\u{00E9}")   // accented
+        #expect(result[1] == "\u{4F60}\u{597D}") // CJK
+        #expect(result[2] == "\u{1F600}")       // emoji
+        #expect(result[3] == "\u{00FC}\u{00F6}\u{00E4}") // umlauts
     }
 
     // MARK: - 6. Rich text (formatting ignored, text concatenated)
 
+    @Test("Rich text concatenates runs")
     func testRichTextConcatenatesRuns() throws {
         let data = xmlData("""
         <si>\
@@ -154,11 +168,12 @@ final class SharedStringsParserTests: XCTestCase {
         </si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["Bold Normal"])
+        #expect(result == ["Bold Normal"])
     }
 
     // MARK: - 7. Multiple rich text runs
 
+    @Test("Multiple rich text runs")
     func testMultipleRichTextRuns() throws {
         let data = xmlData("""
         <si>\
@@ -169,11 +184,12 @@ final class SharedStringsParserTests: XCTestCase {
         </si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["One Two Three Four"])
+        #expect(result == ["One Two Three Four"])
     }
 
     // MARK: - 8. Mixed simple and rich text entries
 
+    @Test("Mixed simple and rich text")
     func testMixedSimpleAndRichText() throws {
         let data = xmlData("""
         <si><t>Simple</t></si>\
@@ -181,21 +197,23 @@ final class SharedStringsParserTests: XCTestCase {
         <si><t>Plain</t></si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, ["Simple", "Rich Text", "Plain"])
+        #expect(result == ["Simple", "Rich Text", "Plain"])
     }
 
     // MARK: - 9. Preserved whitespace
 
+    @Test("Preserved whitespace")
     func testPreservedWhitespace() throws {
         let data = xmlData("""
         <si><t xml:space="preserve"> padded </t></si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result, [" padded "])
+        #expect(result == [" padded "])
     }
 
     // MARK: - 10. Large table (1000 strings)
 
+    @Test("Large table")
     func testLargeTable() throws {
         var body = ""
         for i in 0..<1000 {
@@ -203,15 +221,16 @@ final class SharedStringsParserTests: XCTestCase {
         }
         let data = xmlData(body)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result.count, 1000)
-        XCTAssertEqual(result[0], "String_0")
-        XCTAssertEqual(result[42], "String_42")
-        XCTAssertEqual(result[500], "String_500")
-        XCTAssertEqual(result[999], "String_999")
+        #expect(result.count == 1000)
+        #expect(result[0] == "String_0")
+        #expect(result[42] == "String_42")
+        #expect(result[500] == "String_500")
+        #expect(result[999] == "String_999")
     }
 
     // MARK: - 11. Special XML characters (entity references)
 
+    @Test("Special XML characters")
     func testSpecialXMLCharacters() throws {
         let data = xmlData("""
         <si><t>A &amp; B</t></si>\
@@ -221,15 +240,16 @@ final class SharedStringsParserTests: XCTestCase {
         <si><t>it&apos;s</t></si>
         """)
         let result = try SharedStringsParser.parse(data: data)
-        XCTAssertEqual(result[0], "A & B")
-        XCTAssertEqual(result[1], "x < y")
-        XCTAssertEqual(result[2], "y > x")
-        XCTAssertEqual(result[3], "\"quoted\"")
-        XCTAssertEqual(result[4], "it's")
+        #expect(result[0] == "A & B")
+        #expect(result[1] == "x < y")
+        #expect(result[2] == "y > x")
+        #expect(result[3] == "\"quoted\"")
+        #expect(result[4] == "it's")
     }
 
     // MARK: - 12. Round-trip with SharedStrings.toXML()
 
+    @Test("Round trip with shared strings writer")
     func testRoundTripWithSharedStringsWriter() throws {
         let sharedStrings = SharedStrings()
         _ = sharedStrings.index(for: "Revenue")
@@ -242,11 +262,11 @@ final class SharedStringsParserTests: XCTestCase {
         let data = Data(xml.utf8)
         let parsed = try SharedStringsParser.parse(data: data)
 
-        XCTAssertEqual(parsed.count, 5)
-        XCTAssertEqual(parsed[0], "Revenue")
-        XCTAssertEqual(parsed[1], "Expenses")
-        XCTAssertEqual(parsed[2], "Net Income")
-        XCTAssertEqual(parsed[3], "Q1 & Q2")
-        XCTAssertEqual(parsed[4], "\"Total\"")
+        #expect(parsed.count == 5)
+        #expect(parsed[0] == "Revenue")
+        #expect(parsed[1] == "Expenses")
+        #expect(parsed[2] == "Net Income")
+        #expect(parsed[3] == "Q1 & Q2")
+        #expect(parsed[4] == "\"Total\"")
     }
 }

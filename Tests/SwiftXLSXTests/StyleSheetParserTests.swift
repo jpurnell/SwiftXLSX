@@ -1,7 +1,9 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
-final class StyleSheetParserTests: XCTestCase {
+@Suite
+struct StyleSheetParserTests {
 
     // MARK: - Helpers
 
@@ -29,56 +31,62 @@ final class StyleSheetParserTests: XCTestCase {
 
     // MARK: - 1. Empty data
 
+    @Test("Empty data returns empty style sheet")
     func testEmptyDataReturnsEmptyStyleSheet() throws {
         let result = try StyleSheetParser.parse(data: Data())
-        XCTAssertTrue(result.fonts.isEmpty)
-        XCTAssertTrue(result.fills.isEmpty)
-        XCTAssertTrue(result.borders.isEmpty)
-        XCTAssertTrue(result.cellFormats.isEmpty)
-        XCTAssertTrue(result.numberFormats.isEmpty)
+        #expect(result.fonts.isEmpty)
+        #expect(result.fills.isEmpty)
+        #expect(result.borders.isEmpty)
+        #expect(result.cellFormats.isEmpty)
+        #expect(result.numberFormats.isEmpty)
     }
 
     // MARK: - Number Formats
 
     // 2. Built-in format ID 0 -> .general
+    @Test("Builtin format id0 is general")
     func testBuiltinFormatId0IsGeneral() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.numberFormat, .general)
+        #expect(style.numberFormat == .general)
     }
 
     // 3. Built-in format ID 4 -> "$#,##0.00"
+    @Test("Builtin format id4 is currency")
     func testBuiltinFormatId4IsCurrency() throws {
         let data = fullStylesXML(
             cellXfs: "<cellXfs count=\"1\"><xf numFmtId=\"4\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs>"
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.numberFormat, NumberFormat(formatString: "$#,##0.00"))
+        #expect(style.numberFormat == NumberFormat(formatString: "$#,##0.00"))
     }
 
     // 4. Built-in format ID 10 -> "0.00%"
+    @Test("Builtin format id10 is percent")
     func testBuiltinFormatId10IsPercent() throws {
         let data = fullStylesXML(
             cellXfs: "<cellXfs count=\"1\"><xf numFmtId=\"10\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs>"
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.numberFormat, .percent)
+        #expect(style.numberFormat == .percent)
     }
 
     // 5. Built-in format ID 14 -> "mm/dd/yyyy"
+    @Test("Builtin format id14 is date")
     func testBuiltinFormatId14IsDate() throws {
         let data = fullStylesXML(
             cellXfs: "<cellXfs count=\"1\"><xf numFmtId=\"14\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs>"
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.numberFormat, .date)
+        #expect(style.numberFormat == .date)
     }
 
     // 6. Custom format (ID 164+)
+    @Test("Custom number format")
     func testCustomNumberFormat() throws {
         let data = fullStylesXML(
             numFmts: "<numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"0.000%\"/></numFmts>",
@@ -86,72 +94,79 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.numberFormat, NumberFormat(formatString: "0.000%"))
+        #expect(style.numberFormat == NumberFormat(formatString: "0.000%"))
     }
 
     // 7. Unknown format ID -> .general fallback
+    @Test("Unknown format id falls back to general")
     func testUnknownFormatIdFallsBackToGeneral() throws {
         let data = fullStylesXML(
             cellXfs: "<cellXfs count=\"1\"><xf numFmtId=\"999\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs>"
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.numberFormat, .general)
+        #expect(style.numberFormat == .general)
     }
 
     // MARK: - Fonts
 
     // 8. Default font (Calibri 11pt)
+    @Test("Default font")
     func testDefaultFont() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.fonts.count, 1)
-        XCTAssertEqual(result.fonts[0].name, "Calibri")
-        XCTAssertEqual(result.fonts[0].size, 11)
-        XCTAssertFalse(result.fonts[0].bold)
-        XCTAssertFalse(result.fonts[0].italic)
-        XCTAssertFalse(result.fonts[0].underline)
-        XCTAssertNil(result.fonts[0].color)
+        #expect(result.fonts.count == 1)
+        #expect(result.fonts[0].name == "Calibri")
+        #expect(result.fonts[0].size.isEqual(to: 11))
+        #expect(!(result.fonts[0].bold))
+        #expect(!(result.fonts[0].italic))
+        #expect(!(result.fonts[0].underline))
+        #expect(result.fonts[0].color == nil)
     }
 
     // 9. Bold font
+    @Test("Bold font")
     func testBoldFont() throws {
         let data = fullStylesXML(
             fonts: "<fonts count=\"1\"><font><b/><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts>"
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.fonts.count, 1)
-        XCTAssertTrue(result.fonts[0].bold)
+        #expect(result.fonts.count == 1)
+        #expect(result.fonts[0].bold)
     }
 
     // 10. Italic font
+    @Test("Italic font")
     func testItalicFont() throws {
         let data = fullStylesXML(
             fonts: "<fonts count=\"1\"><font><i/><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts>"
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertTrue(result.fonts[0].italic)
+        #expect(result.fonts[0].italic)
     }
 
     // 11. Underline font
+    @Test("Underline font")
     func testUnderlineFont() throws {
         let data = fullStylesXML(
             fonts: "<fonts count=\"1\"><font><u/><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts>"
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertTrue(result.fonts[0].underline)
+        #expect(result.fonts[0].underline)
     }
 
     // 12. Font with color
+    @Test("Font with color")
     func testFontWithColor() throws {
         let data = fullStylesXML(
             fonts: "<fonts count=\"1\"><font><sz val=\"11\"/><color rgb=\"FFFF0000\"/><name val=\"Calibri\"/></font></fonts>"
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.fonts[0].color, "FFFF0000")
+        #expect(result.fonts[0].color == "FFFF0000")
     }
 
     // 13. Font with all properties
+    @Test("Font with all properties")
     func testFontWithAllProperties() throws {
         let data = fullStylesXML(
             fonts: """
@@ -165,15 +180,16 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let font = result.fonts[0]
-        XCTAssertEqual(font.name, "SF Mono")
-        XCTAssertEqual(font.size, 14.5)
-        XCTAssertEqual(font.color, "FF0000FF")
-        XCTAssertTrue(font.bold)
-        XCTAssertTrue(font.italic)
-        XCTAssertTrue(font.underline)
+        #expect(font.name == "SF Mono")
+        #expect(font.size.isEqual(to: 14.5))
+        #expect(font.color == "FF0000FF")
+        #expect(font.bold)
+        #expect(font.italic)
+        #expect(font.underline)
     }
 
     // 14. Multiple fonts (verify fontId indexing)
+    @Test("Multiple fonts preserve order")
     func testMultipleFontsPreserveOrder() throws {
         let data = fullStylesXML(
             fonts: """
@@ -192,42 +208,45 @@ final class StyleSheetParserTests: XCTestCase {
             """
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.fonts.count, 3)
+        #expect(result.fonts.count == 3)
         // Index 0: default
-        XCTAssertFalse(result.fonts[0].bold)
+        #expect(!(result.fonts[0].bold))
         // Index 1: bold
-        XCTAssertTrue(result.fonts[1].bold)
+        #expect(result.fonts[1].bold)
         // Index 2: large Arial
-        XCTAssertEqual(result.fonts[2].name, "Arial")
-        XCTAssertEqual(result.fonts[2].size, 18)
+        #expect(result.fonts[2].name == "Arial")
+        #expect(result.fonts[2].size.isEqual(to: 18))
         // Resolve style index 1 -> bold font
         let style1 = result.resolve(styleIndex: 1)
-        XCTAssertTrue(style1.font.bold)
+        #expect(style1.font.bold)
         // Resolve style index 2 -> large Arial
         let style2 = result.resolve(styleIndex: 2)
-        XCTAssertEqual(style2.font.name, "Arial")
+        #expect(style2.font.name == "Arial")
     }
 
     // MARK: - Fills
 
     // 15. None fill (patternType="none")
+    @Test("None fill")
     func testNoneFill() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
         // First fill is always "none" -> stored as nil
-        XCTAssertNil(result.fills[0])
+        #expect(result.fills[0] == nil)
     }
 
     // 16. Gray125 fill
+    @Test("Gray125 fill")
     func testGray125Fill() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.fills.count, 2)
+        #expect(result.fills.count == 2)
         // Second fill is always gray125
-        XCTAssertEqual(result.fills[1], Fill(patternType: .gray125))
+        #expect(result.fills[1] == Fill(patternType: .gray125))
     }
 
     // 17. Solid fill with foreground color
+    @Test("Solid fill with color")
     func testSolidFillWithColor() throws {
         let data = fullStylesXML(
             fills: """
@@ -240,34 +259,37 @@ final class StyleSheetParserTests: XCTestCase {
             cellXfs: "<cellXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"2\" borderId=\"0\"/></cellXfs>"
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.fills.count, 3)
-        XCTAssertEqual(result.fills[2], Fill(patternType: .solid, foregroundColor: "FFFFFF00"))
+        #expect(result.fills.count == 3)
+        #expect(result.fills[2] == Fill(patternType: .solid, foregroundColor: "FFFFFF00"))
         // Resolve produces correct fill
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.fill, .solid("FFFFFF00"))
+        #expect(style.fill == .solid("FFFFFF00"))
     }
 
     // 18. First two fills always none + gray125
+    @Test("First two fills are standard")
     func testFirstTwoFillsAreStandard() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.fills.count, 2)
-        XCTAssertNil(result.fills[0])
-        XCTAssertEqual(result.fills[1], Fill(patternType: .gray125))
+        #expect(result.fills.count == 2)
+        #expect(result.fills[0] == nil)
+        #expect(result.fills[1] == Fill(patternType: .gray125))
     }
 
     // MARK: - Borders
 
     // 19. Empty border (no styled edges)
+    @Test("Empty border")
     func testEmptyBorder() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.borders.count, 1)
+        #expect(result.borders.count == 1)
         // Empty border elements with no style -> nil
-        XCTAssertNil(result.borders[0])
+        #expect(result.borders[0] == nil)
     }
 
     // 20. Thin border all sides
+    @Test("Thin border all sides")
     func testThinBorderAllSides() throws {
         let data = fullStylesXML(
             borders: """
@@ -280,16 +302,17 @@ final class StyleSheetParserTests: XCTestCase {
             """
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.borders.count, 1)
-        let border = result.borders[0]
-        XCTAssertNotNil(border)
-        XCTAssertEqual(border?.top, Border.BorderEdge(style: .thin, color: "FF000000"))
-        XCTAssertEqual(border?.bottom, Border.BorderEdge(style: .thin, color: "FF000000"))
-        XCTAssertEqual(border?.left, Border.BorderEdge(style: .thin, color: "FF000000"))
-        XCTAssertEqual(border?.right, Border.BorderEdge(style: .thin, color: "FF000000"))
+        #expect(result.borders.count == 1)
+        let border = try #require(result.borders[0])
+        #expect(border == Border.thin)
+        #expect(border.top == Border.BorderEdge(style: .thin, color: "FF000000"))
+        #expect(border.bottom == Border.BorderEdge(style: .thin, color: "FF000000"))
+        #expect(border.left == Border.BorderEdge(style: .thin, color: "FF000000"))
+        #expect(border.right == Border.BorderEdge(style: .thin, color: "FF000000"))
     }
 
     // 21. Bottom-only border
+    @Test("Bottom only border")
     func testBottomOnlyBorder() throws {
         let data = fullStylesXML(
             borders: """
@@ -300,15 +323,16 @@ final class StyleSheetParserTests: XCTestCase {
             """
         )
         let result = try StyleSheetParser.parse(data: data)
-        let border = result.borders[0]
-        XCTAssertNotNil(border)
-        XCTAssertNil(border?.top)
-        XCTAssertNil(border?.left)
-        XCTAssertNil(border?.right)
-        XCTAssertEqual(border?.bottom, Border.BorderEdge(style: .thin, color: "FF000000"))
+        let border = try #require(result.borders[0])
+        #expect(border == Border(bottom: Border.BorderEdge(style: .thin, color: "FF000000")))
+        #expect(border.top == nil)
+        #expect(border.left == nil)
+        #expect(border.right == nil)
+        #expect(border.bottom == Border.BorderEdge(style: .thin, color: "FF000000"))
     }
 
     // 22. Border with custom color
+    @Test("Border with color")
     func testBorderWithColor() throws {
         let data = fullStylesXML(
             borders: """
@@ -319,13 +343,14 @@ final class StyleSheetParserTests: XCTestCase {
             """
         )
         let result = try StyleSheetParser.parse(data: data)
-        let border = result.borders[0]
-        XCTAssertNotNil(border)
-        XCTAssertEqual(border?.left?.color, "FF0000FF")
-        XCTAssertEqual(border?.left?.style, .thin)
+        let border = try #require(result.borders[0])
+        #expect(border == Border(left: Border.BorderEdge(style: .thin, color: "FF0000FF")))
+        #expect(border.left?.color == "FF0000FF")
+        #expect(border.left?.style == .thin)
     }
 
     // 23. Mixed border styles (thin bottom, medium top)
+    @Test("Mixed border styles")
     func testMixedBorderStyles() throws {
         let data = fullStylesXML(
             borders: """
@@ -337,17 +362,21 @@ final class StyleSheetParserTests: XCTestCase {
             """
         )
         let result = try StyleSheetParser.parse(data: data)
-        let border = result.borders[0]
-        XCTAssertNotNil(border)
-        XCTAssertEqual(border?.top?.style, .medium)
-        XCTAssertEqual(border?.bottom?.style, .thin)
-        XCTAssertNil(border?.left)
-        XCTAssertNil(border?.right)
+        let border = try #require(result.borders[0])
+        #expect(border == Border(
+            top: Border.BorderEdge(style: .medium, color: "FF000000"),
+            bottom: Border.BorderEdge(style: .thin, color: "FF000000")
+        ))
+        #expect(border.top?.style == .medium)
+        #expect(border.bottom?.style == .thin)
+        #expect(border.left == nil)
+        #expect(border.right == nil)
     }
 
     // MARK: - Alignment
 
     // 24. Horizontal alignment (center)
+    @Test("Horizontal alignment")
     func testHorizontalAlignment() throws {
         let data = fullStylesXML(
             cellXfs: """
@@ -358,12 +387,14 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertNotNil(style.alignment)
-        XCTAssertEqual(style.alignment?.horizontal, .center)
-        XCTAssertNil(style.alignment?.vertical)
+        let alignment = try #require(style.alignment)
+        #expect(alignment == Alignment(horizontal: .center))
+        #expect(alignment.horizontal == .center)
+        #expect(alignment.vertical == nil)
     }
 
     // 25. Vertical alignment (center)
+    @Test("Vertical alignment")
     func testVerticalAlignment() throws {
         let data = fullStylesXML(
             cellXfs: """
@@ -374,11 +405,13 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertNotNil(style.alignment)
-        XCTAssertEqual(style.alignment?.vertical, .center)
+        let alignment = try #require(style.alignment)
+        #expect(alignment == Alignment(vertical: .center))
+        #expect(alignment.vertical == .center)
     }
 
     // 26. Wrap text
+    @Test("Wrap text")
     func testWrapText() throws {
         let data = fullStylesXML(
             cellXfs: """
@@ -389,11 +422,13 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertNotNil(style.alignment)
-        XCTAssertEqual(style.alignment?.wrapText, true)
+        let alignment = try #require(style.alignment)
+        #expect(alignment == Alignment(wrapText: true))
+        #expect(alignment.wrapText == true)
     }
 
     // 27. Indent
+    @Test("Indent")
     func testIndent() throws {
         let data = fullStylesXML(
             cellXfs: """
@@ -404,11 +439,13 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertNotNil(style.alignment)
-        XCTAssertEqual(style.alignment?.indent, 3)
+        let alignment = try #require(style.alignment)
+        #expect(alignment == Alignment(indent: 3))
+        #expect(alignment.indent == 3)
     }
 
     // 28. Combined alignment properties
+    @Test("Combined alignment")
     func testCombinedAlignment() throws {
         let data = fullStylesXML(
             cellXfs: """
@@ -419,28 +456,31 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertNotNil(style.alignment)
-        XCTAssertEqual(style.alignment?.horizontal, .right)
-        XCTAssertEqual(style.alignment?.vertical, .top)
-        XCTAssertEqual(style.alignment?.wrapText, true)
-        XCTAssertEqual(style.alignment?.indent, 2)
+        let alignment = try #require(style.alignment)
+        #expect(alignment == Alignment(horizontal: .right, vertical: .top, wrapText: true, indent: 2))
+        #expect(alignment.horizontal == .right)
+        #expect(alignment.vertical == .top)
+        #expect(alignment.wrapText == true)
+        #expect(alignment.indent == 2)
     }
 
     // MARK: - CellXfs (combined resolution)
 
     // 29. Style index 0 -> default/general
+    @Test("Style index0 is default")
     func testStyleIndex0IsDefault() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertEqual(style.font, Font())
-        XCTAssertEqual(style.numberFormat, .general)
-        XCTAssertNil(style.border)
-        XCTAssertNil(style.fill)
-        XCTAssertNil(style.alignment)
+        #expect(style.font == Font())
+        #expect(style.numberFormat == .general)
+        #expect(style.border == nil)
+        #expect(style.fill == nil)
+        #expect(style.alignment == nil)
     }
 
     // 30. Bold header style (fontId=1 with bold font)
+    @Test("Bold header style resolution")
     func testBoldHeaderStyleResolution() throws {
         let data = fullStylesXML(
             fonts: """
@@ -458,12 +498,13 @@ final class StyleSheetParserTests: XCTestCase {
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 1)
-        XCTAssertTrue(style.font.bold)
-        XCTAssertEqual(style.font.name, "Calibri")
-        XCTAssertEqual(style.font.size, 11)
+        #expect(style.font.bold)
+        #expect(style.font.name == "Calibri")
+        #expect(style.font.size.isEqual(to: 11))
     }
 
     // 31. Fully styled cell (custom numfmt + fill + border + alignment)
+    @Test("Fully styled cell resolution")
     func testFullyStyledCellResolution() throws {
         let data = fullStylesXML(
             numFmts: "<numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"0.000%\"/></numFmts>",
@@ -504,48 +545,51 @@ final class StyleSheetParserTests: XCTestCase {
         let style = result.resolve(styleIndex: 1)
 
         // Font
-        XCTAssertTrue(style.font.bold)
-        XCTAssertTrue(style.font.italic)
-        XCTAssertEqual(style.font.size, 12)
-        XCTAssertEqual(style.font.color, "FFFF0000")
-        XCTAssertEqual(style.font.name, "Arial")
+        #expect(style.font.bold)
+        #expect(style.font.italic)
+        #expect(style.font.size.isEqual(to: 12))
+        #expect(style.font.color == "FFFF0000")
+        #expect(style.font.name == "Arial")
 
         // Number format
-        XCTAssertEqual(style.numberFormat, NumberFormat(formatString: "0.000%"))
+        #expect(style.numberFormat == NumberFormat(formatString: "0.000%"))
 
         // Fill
-        XCTAssertEqual(style.fill, .solid("FFFFFF00"))
+        #expect(style.fill == .solid("FFFFFF00"))
 
         // Border
-        XCTAssertNotNil(style.border)
-        XCTAssertEqual(style.border, Border.thin)
+        #expect(style.border == Border.thin)
 
         // Alignment
-        XCTAssertNotNil(style.alignment)
-        XCTAssertEqual(style.alignment?.horizontal, .center)
-        XCTAssertEqual(style.alignment?.vertical, .center)
-        XCTAssertEqual(style.alignment?.wrapText, true)
+        let alignment = try #require(style.alignment)
+        #expect(alignment == Alignment(horizontal: .center, vertical: .center, wrapText: true))
+        #expect(alignment.horizontal == .center)
+        #expect(alignment.vertical == .center)
+        #expect(alignment.wrapText == true)
     }
 
     // 32. Out-of-range style index -> .general fallback
+    @Test("Out of range style index returns general")
     func testOutOfRangeStyleIndexReturnsGeneral() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 999)
-        XCTAssertEqual(style, .general)
+        #expect(style == .general)
     }
 
     // 33. Negative style index -> .general fallback
+    @Test("Negative style index returns general")
     func testNegativeStyleIndexReturnsGeneral() throws {
         let data = fullStylesXML()
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: -1)
-        XCTAssertEqual(style, .general)
+        #expect(style == .general)
     }
 
     // MARK: - Round-trip
 
     // 34. Parse XML generated by StyleSheet.toXML()
+    @Test("Round trip with style sheet writer")
     func testRoundTripWithStyleSheetWriter() throws {
         let sheet = StyleSheet()
 
@@ -579,53 +623,54 @@ final class StyleSheetParserTests: XCTestCase {
 
         // Verify bold style
         let resolvedBold = parsed.resolve(styleIndex: boldIdx)
-        XCTAssertTrue(resolvedBold.font.bold)
+        #expect(resolvedBold.font.bold)
 
         // Verify currency
         let resolvedCurrency = parsed.resolve(styleIndex: currIdx)
-        XCTAssertEqual(resolvedCurrency.numberFormat, .currency)
+        #expect(resolvedCurrency.numberFormat == .currency)
 
         // Verify date
         let resolvedDate = parsed.resolve(styleIndex: dateIdx)
-        XCTAssertEqual(resolvedDate.numberFormat, .date)
+        #expect(resolvedDate.numberFormat == .date)
 
         // Verify filled
         let resolvedFilled = parsed.resolve(styleIndex: fillIdx)
-        XCTAssertEqual(resolvedFilled.fill, .solid("FFFFFF00"))
+        #expect(resolvedFilled.fill == .solid("FFFFFF00"))
 
         // Verify bordered
         let resolvedBordered = parsed.resolve(styleIndex: borderIdx)
-        XCTAssertNotNil(resolvedBordered.border)
-        XCTAssertEqual(resolvedBordered.border?.top, Border.BorderEdge())
-        XCTAssertEqual(resolvedBordered.border?.bottom, Border.BorderEdge())
-        XCTAssertEqual(resolvedBordered.border?.left, Border.BorderEdge())
-        XCTAssertEqual(resolvedBordered.border?.right, Border.BorderEdge())
+        #expect(resolvedBordered.border == Border.thin)
+        #expect(resolvedBordered.border?.top == Border.BorderEdge())
+        #expect(resolvedBordered.border?.bottom == Border.BorderEdge())
+        #expect(resolvedBordered.border?.left == Border.BorderEdge())
+        #expect(resolvedBordered.border?.right == Border.BorderEdge())
 
         // Verify aligned
         let resolvedAligned = parsed.resolve(styleIndex: alignIdx)
-        XCTAssertEqual(resolvedAligned.alignment?.horizontal, .center)
-        XCTAssertEqual(resolvedAligned.alignment?.vertical, .center)
-        XCTAssertEqual(resolvedAligned.alignment?.wrapText, true)
+        #expect(resolvedAligned.alignment?.horizontal == .center)
+        #expect(resolvedAligned.alignment?.vertical == .center)
+        #expect(resolvedAligned.alignment?.wrapText == true)
 
         // Verify complex style
         let resolvedComplex = parsed.resolve(styleIndex: complexIdx)
-        XCTAssertEqual(resolvedComplex.font.name, "Arial")
-        XCTAssertEqual(resolvedComplex.font.size, 14)
-        XCTAssertEqual(resolvedComplex.font.color, "FFFF0000")
-        XCTAssertTrue(resolvedComplex.font.bold)
-        XCTAssertTrue(resolvedComplex.font.italic)
-        XCTAssertNotNil(resolvedComplex.border)
-        XCTAssertEqual(resolvedComplex.border?.bottom?.style, .medium)
-        XCTAssertEqual(resolvedComplex.border?.bottom?.color, "FF0000FF")
-        XCTAssertEqual(resolvedComplex.alignment?.horizontal, .right)
-        XCTAssertEqual(resolvedComplex.alignment?.indent, 2)
-        XCTAssertEqual(resolvedComplex.numberFormat, .percent)
-        XCTAssertEqual(resolvedComplex.fill, .solid("FF00FF00"))
+        #expect(resolvedComplex.font.name == "Arial")
+        #expect(resolvedComplex.font.size.isEqual(to: 14))
+        #expect(resolvedComplex.font.color == "FFFF0000")
+        #expect(resolvedComplex.font.bold)
+        #expect(resolvedComplex.font.italic)
+        #expect(resolvedComplex.border == Border(bottom: Border.BorderEdge(style: .medium, color: "FF0000FF")))
+        #expect(resolvedComplex.border?.bottom?.style == .medium)
+        #expect(resolvedComplex.border?.bottom?.color == "FF0000FF")
+        #expect(resolvedComplex.alignment?.horizontal == .right)
+        #expect(resolvedComplex.alignment?.indent == 2)
+        #expect(resolvedComplex.numberFormat == .percent)
+        #expect(resolvedComplex.fill == .solid("FF00FF00"))
     }
 
     // MARK: - Edge cases
 
     // 35. Multiple custom number formats
+    @Test("Multiple custom number formats")
     func testMultipleCustomNumberFormats() throws {
         let data = fullStylesXML(
             numFmts: """
@@ -644,25 +689,24 @@ final class StyleSheetParserTests: XCTestCase {
             """
         )
         let result = try StyleSheetParser.parse(data: data)
-        XCTAssertEqual(result.resolve(styleIndex: 0).numberFormat,
-                       NumberFormat(formatString: "0.000%"))
-        XCTAssertEqual(result.resolve(styleIndex: 1).numberFormat,
-                       NumberFormat(formatString: "#,##0.0000"))
-        XCTAssertEqual(result.resolve(styleIndex: 2).numberFormat,
-                       NumberFormat(formatString: "yyyy-mm-dd"))
+        #expect(result.resolve(styleIndex: 0).numberFormat == NumberFormat(formatString: "0.000%"))
+        #expect(result.resolve(styleIndex: 1).numberFormat == NumberFormat(formatString: "#,##0.0000"))
+        #expect(result.resolve(styleIndex: 2).numberFormat == NumberFormat(formatString: "yyyy-mm-dd"))
     }
 
     // 36. No alignment element -> nil alignment
+    @Test("No alignment is nil")
     func testNoAlignmentIsNil() throws {
         let data = fullStylesXML(
             cellXfs: "<cellXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs>"
         )
         let result = try StyleSheetParser.parse(data: data)
         let style = result.resolve(styleIndex: 0)
-        XCTAssertNil(style.alignment)
+        #expect(style.alignment == nil)
     }
 
     // 37. Border with style but no color child (defaults to FF000000)
+    @Test("Border style without color defaults to black")
     func testBorderStyleWithoutColorDefaultsToBlack() throws {
         let data = fullStylesXML(
             borders: """
@@ -673,9 +717,9 @@ final class StyleSheetParserTests: XCTestCase {
             """
         )
         let result = try StyleSheetParser.parse(data: data)
-        let border = result.borders[0]
-        XCTAssertNotNil(border)
-        XCTAssertEqual(border?.left?.style, .thin)
-        XCTAssertEqual(border?.left?.color, "FF000000")
+        let border = try #require(result.borders[0])
+        #expect(border == Border(left: Border.BorderEdge(style: .thin, color: "FF000000")))
+        #expect(border.left?.style == .thin)
+        #expect(border.left?.color == "FF000000")
     }
 }

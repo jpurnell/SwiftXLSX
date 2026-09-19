@@ -1,4 +1,5 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 import SwiftExcelCore
 
@@ -10,7 +11,8 @@ import SwiftExcelCore
 /// would produce hundreds of billions of addresses and the graph would never
 /// finish. Above ``DependencyGraph/exactEnumerationLimit`` the range is
 /// intersected with the cells that exist instead.
-final class DependencyGraphWholeColumnTests: XCTestCase {
+@Suite
+struct DependencyGraphWholeColumnTests {
 
     private func sheet(_ build: (Worksheet) -> Void) -> Worksheet {
         let workbook = Workbook()
@@ -20,6 +22,7 @@ final class DependencyGraphWholeColumnTests: XCTestCase {
     }
 
     /// The point of the whole exercise: this must terminate, and quickly.
+    @Test("A whole column sum depends only on what is in the column")
     func testAWholeColumnSumDependsOnlyOnWhatIsInTheColumn() {
         let sheet = sheet { sheet in
             sheet.write(1.0, to: "A1")
@@ -33,13 +36,14 @@ final class DependencyGraphWholeColumnTests: XCTestCase {
         let graph = DependencyGraph(sheet: sheet)
         let precedents = graph.precedents(of: CellAddress(sheet: "Sheet1", ref: "C1"))
 
-        XCTAssertEqual(precedents.count, 3, "A1, A2 and A9000 — not a million empties")
-        XCTAssertEqual(Set(precedents.map(\.cell.reference)), ["A1", "A2", "A9000"])
+        #expect(precedents.count == 3, "A1, A2 and A9000 — not a million empties")
+        #expect(Set(precedents.map(\.cell.reference)) == ["A1", "A2", "A9000"])
     }
 
     /// Below the limit nothing changes, empty cells included. `A1:A5` names five
     /// cells whether or not anything is in them, and an evaluator still has to
     /// visit an empty one to learn it is zero.
+    @Test("A small range still enumerates empty cells")
     func testASmallRangeStillEnumeratesEmptyCells() {
         let sheet = sheet { sheet in
             sheet.write(1.0, to: "A1")
@@ -49,11 +53,12 @@ final class DependencyGraphWholeColumnTests: XCTestCase {
         }
 
         let graph = DependencyGraph(sheet: sheet)
-        XCTAssertEqual(graph.precedents(of: CellAddress(sheet: "Sheet1", ref: "C1")).count, 5)
+        #expect(graph.precedents(of: CellAddress(sheet: "Sheet1", ref: "C1")).count == 5)
     }
 
     /// The bound applies to a range nested inside a call, which is where every
     /// real one appears — `SUMIFS(Sheet2!$E:$E, ...)` rather than a bare range.
+    @Test("The bound applies inside A function call")
     func testTheBoundAppliesInsideAFunctionCall() throws {
         let formula = try FormulaParser.parse("SUM($A:$A)")
         let sheet = sheet { sheet in
@@ -63,22 +68,26 @@ final class DependencyGraphWholeColumnTests: XCTestCase {
 
         let graph = DependencyGraph(sheet: sheet)
         let precedents = graph.precedents(of: CellAddress(sheet: "Sheet1", ref: "C1"))
-        XCTAssertEqual(precedents.map(\.cell.reference), ["A3"])
+        #expect(precedents.map(\.cell.reference) == ["A3"])
     }
 
+    @Test("A whole column range parses to the full column")
     func testAWholeColumnRangeParsesToTheFullColumn() throws {
         guard case .cellRange(let range) = try FormulaParser.parse("$E:$E") else {
-            return XCTFail("expected a range")
+            Issue.record("expected a range")
+            return
         }
-        XCTAssertEqual(range.start, CellRef(column: 5, row: 1))
-        XCTAssertEqual(range.end, CellRef(column: 5, row: 1_048_576))
+        #expect(range.start == CellRef(column: 5, row: 1))
+        #expect(range.end == CellRef(column: 5, row: 1_048_576))
     }
 
+    @Test("A whole row range spans every column")
     func testAWholeRowRangeSpansEveryColumn() throws {
         guard case .cellRange(let range) = try FormulaParser.parse("$2:$3") else {
-            return XCTFail("expected a range")
+            Issue.record("expected a range")
+            return
         }
-        XCTAssertEqual(range.start, CellRef(column: 1, row: 2))
-        XCTAssertEqual(range.end, CellRef(column: 16_384, row: 3))
+        #expect(range.start == CellRef(column: 1, row: 2))
+        #expect(range.end == CellRef(column: 16_384, row: 3))
     }
 }

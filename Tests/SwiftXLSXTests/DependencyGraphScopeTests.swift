@@ -1,4 +1,5 @@
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftXLSX
 
 /// Building a dependency graph over part of a workbook.
@@ -16,7 +17,8 @@ import XCTest
 ///
 /// So the scope has to be given before the graph is built, which is what these
 /// initializers are for.
-final class DependencyGraphScopeTests: XCTestCase {
+@Suite
+struct DependencyGraphScopeTests {
 
     /// Two sheets. On `Model`: a title, two numbers, a formula reading them, and
     /// a formula reading a cell that holds nothing. On `Other`: one number, so a
@@ -48,18 +50,18 @@ final class DependencyGraphScopeTests: XCTestCase {
 
     // MARK: - Scoping to a sheet
 
+    @Test("A sheet scoped graph holds only that sheets cells")
     func testASheetScopedGraphHoldsOnlyThatSheetsCells() {
         let book = workbook()
         let sheet = book.sheets[0]
         let graph = DependencyGraph(sheet: sheet)
 
-        XCTAssertTrue(
-            graph.allCells.allSatisfy { $0.sheet == "Model" },
-            "Got: \(graph.allCells.map(\.sheet).sorted())")
+        #expect(graph.allCells.allSatisfy { $0.sheet == "Model" }, "Got: \(graph.allCells.map(\.sheet).sorted())")
     }
 
     /// A formula reaching into another sheet has a precedent the scope excludes.
     /// The edge goes with it, rather than pulling a foreign cell into the graph.
+    @Test("A cross sheet reference is not pulled in")
     func testACrossSheetReferenceIsNotPulledIn() {
         let book = workbook()
         book.sheets[0].write(
@@ -69,69 +71,58 @@ final class DependencyGraphScopeTests: XCTestCase {
 
         let graph = DependencyGraph(sheet: book.sheets[0])
 
-        XCTAssertFalse(
-            graph.allCells.contains { $0.sheet == "Other" },
-            "the scope is the sheet, so a reference out of it is out of the graph")
-        XCTAssertTrue(graph.allCells.contains(CellAddress(sheet: "Model", ref: "B7")))
+        #expect(!(graph.allCells.contains { $0.sheet == "Other" }), "the scope is the sheet, so a reference out of it is out of the graph")
+        #expect(graph.allCells.contains(CellAddress(sheet: "Model", ref: "B7")))
     }
 
     // MARK: - Scoping by content
 
     /// A title is not a quantity. Nothing depends on `A1`, and it depends on
     /// nothing — it is in the sheet, not in the model.
+    @Test("A content filter excludes labels")
     func testAContentFilterExcludesLabels() {
         let graph = DependencyGraph(sheet: workbook().sheets[0], including: numeric)
 
-        XCTAssertFalse(
-            graph.allCells.contains(CellAddress(sheet: "Model", ref: "A1")),
-            "Got: \(graph.allCells.map(\.cell.reference).sorted())")
-        XCTAssertTrue(graph.allCells.contains(CellAddress(sheet: "Model", ref: "B2")))
-        XCTAssertTrue(graph.allCells.contains(CellAddress(sheet: "Model", ref: "B4")))
+        #expect(!(graph.allCells.contains(CellAddress(sheet: "Model", ref: "A1"))), "Got: \(graph.allCells.map(\.cell.reference).sorted())")
+        #expect(graph.allCells.contains(CellAddress(sheet: "Model", ref: "B2")))
+        #expect(graph.allCells.contains(CellAddress(sheet: "Model", ref: "B4")))
     }
 
     /// The unfiltered graph registers every referenced address, so a formula
     /// pointing at an empty cell mints a node with no value — which then appears
     /// among the inputs, reading as data the model was given. It is not.
+    @Test("An empty referenced cell is not an input")
     func testAnEmptyReferencedCellIsNotAnInput() {
         let book = workbook()
 
         let everything = DependencyGraph(sheet: book.sheets[0])
-        XCTAssertTrue(
-            everything.allCells.contains(CellAddress(sheet: "Model", ref: "B9")),
-            "today's behaviour, and right for evaluation: you visit it to learn it is zero")
+        #expect(everything.allCells.contains(CellAddress(sheet: "Model", ref: "B9")), "today's behaviour, and right for evaluation: you visit it to learn it is zero")
 
         let model = DependencyGraph(sheet: book.sheets[0], including: numeric)
-        XCTAssertFalse(
-            model.allCells.contains(CellAddress(sheet: "Model", ref: "B9")),
-            "but it is not a quantity the model was given")
+        #expect(!(model.allCells.contains(CellAddress(sheet: "Model", ref: "B9"))), "but it is not a quantity the model was given")
     }
 
     // MARK: - The graph still works
 
+    @Test("The scoped graph sorts and reports as usual")
     func testTheScopedGraphSortsAndReportsAsUsual() throws {
         let graph = DependencyGraph(sheet: workbook().sheets[0], including: numeric)
 
-        XCTAssertTrue(graph.isAcyclic)
-        XCTAssertEqual(
-            Set(graph.inputs.map(\.cell.reference)), ["B2", "B3"],
-            "the two numbers, and nothing else")
-        XCTAssertEqual(
-            Set(graph.outputs.map(\.cell.reference)), ["B5"],
-            "nothing reads B5")
+        #expect(graph.isAcyclic)
+        #expect(Set(graph.inputs.map(\.cell.reference)) == ["B2", "B3"], "the two numbers, and nothing else")
+        #expect(Set(graph.outputs.map(\.cell.reference)) == ["B5"], "nothing reads B5")
 
         let order = graph.evaluationOrder.map(\.cell.reference)
-        let b4 = try XCTUnwrap(order.firstIndex(of: "B4"))
-        let b2 = try XCTUnwrap(order.firstIndex(of: "B2"))
-        XCTAssertLessThan(b2, b4, "a cell comes after what it reads")
+        let b4 = try #require(order.firstIndex(of: "B4"))
+        let b2 = try #require(order.firstIndex(of: "B2"))
+        #expect(b2 < b4, "a cell comes after what it reads")
 
-        XCTAssertEqual(graph.precedents(of: CellAddress(sheet: "Model", ref: "B4")).count, 2)
-        XCTAssertEqual(
-            graph.precedents(of: CellAddress(sheet: "Model", ref: "B5")).map(\.cell.reference),
-            ["B4"],
-            "the reference to the empty B9 is dropped with the node")
+        #expect(graph.precedents(of: CellAddress(sheet: "Model", ref: "B4")).count == 2)
+        #expect(graph.precedents(of: CellAddress(sheet: "Model", ref: "B5")).map(\.cell.reference) == ["B4"], "the reference to the empty B9 is dropped with the node")
     }
 
     /// A cycle inside the scope is still found.
+    @Test("A cycle within the scope is still detected")
     func testACycleWithinTheScopeIsStillDetected() {
         let book = Workbook()
         let sheet = book.addSheet(name: "Model")
@@ -140,8 +131,8 @@ final class DependencyGraphScopeTests: XCTestCase {
         sheet.write(FormulaAST.add(.cellRef(CellRef("B1")), .number(1)), to: "B2")
 
         let graph = DependencyGraph(sheet: sheet, including: numeric)
-        XCTAssertFalse(graph.isAcyclic)
-        XCTAssertEqual(graph.cycles.count, 1)
+        #expect(!(graph.isAcyclic))
+        #expect(graph.cycles.count == 1)
     }
 
     // MARK: - Absolute and mixed references
@@ -156,6 +147,7 @@ final class DependencyGraphScopeTests: XCTestCase {
     /// Neither is a small error. Mixed references are how a model fills a rule
     /// across a row while holding one operand still, so the edges lost are the ones
     /// tying every period back to its assumptions.
+    @Test("A mixed reference is the same cell")
     func testAMixedReferenceIsTheSameCell() {
         let book = Workbook()
         let sheet = book.addSheet(name: "Model")
@@ -168,19 +160,13 @@ final class DependencyGraphScopeTests: XCTestCase {
         let graph = DependencyGraph(sheet: sheet, including: numeric)
         let target = CellAddress(sheet: "Model", ref: "C22")
 
-        XCTAssertEqual(
-            Set(graph.precedents(of: target).map(\.cell.reference)), ["C12", "C5"],
-            "Got: \(graph.precedents(of: target).map(\.cell.reference))")
-        XCTAssertEqual(
-            graph.dependents(of: CellAddress(sheet: "Model", ref: "C12"))
-                .map(\.cell.reference),
-            ["C22"],
-            "and the cell knows what reads it")
-        XCTAssertFalse(
-            graph.outputs.contains(CellAddress(sheet: "Model", ref: "C12")),
-            "a cell something reads is not an output")
+        #expect(Set(graph.precedents(of: target).map(\.cell.reference)) == ["C12", "C5"], "Got: \(graph.precedents(of: target).map(\.cell.reference))")
+        #expect(graph.dependents(of: CellAddress(sheet: "Model", ref: "C12"))
+                .map(\.cell.reference) == ["C22"], "and the cell knows what reads it")
+        #expect(!(graph.outputs.contains(CellAddress(sheet: "Model", ref: "C12"))), "a cell something reads is not an output")
     }
 
+    @Test("A fully absolute reference is the same cell")
     func testAFullyAbsoluteReferenceIsTheSameCell() {
         let book = Workbook()
         let sheet = book.addSheet(name: "Model")
@@ -188,13 +174,12 @@ final class DependencyGraphScopeTests: XCTestCase {
         sheet.write(FormulaAST.cellRef(CellRef("$B$3")), to: "D3")
 
         let graph = DependencyGraph(sheet: sheet, including: numeric)
-        XCTAssertEqual(
-            graph.precedents(of: CellAddress(sheet: "Model", ref: "D3"))
-                .map(\.cell.reference),
-            ["B3"])
+        #expect(graph.precedents(of: CellAddress(sheet: "Model", ref: "D3"))
+                .map(\.cell.reference) == ["B3"])
     }
 
     /// The unfiltered graph must not mint a phantom node for the marked form either.
+    @Test("The unfiltered graph does not split on markers")
     func testTheUnfilteredGraphDoesNotSplitOnMarkers() {
         let book = Workbook()
         let sheet = book.addSheet(name: "Model")
@@ -202,25 +187,18 @@ final class DependencyGraphScopeTests: XCTestCase {
         sheet.write(FormulaAST.cellRef(CellRef("$B$3")), to: "D3")
 
         let graph = DependencyGraph(sheet: sheet)
-        XCTAssertEqual(
-            graph.allCells.count, 2,
-            "B3 and D3 — not three. Got: \(graph.allCells.map(\.cell.reference).sorted())")
+        #expect(graph.allCells.count == 2, "B3 and D3 — not three. Got: \(graph.allCells.map(\.cell.reference).sorted())")
     }
 
     // MARK: - The existing initializer is untouched
 
+    @Test("The workbook initializer is unchanged")
     func testTheWorkbookInitializerIsUnchanged() {
         let book = workbook()
         let whole = DependencyGraph(workbook: book)
 
-        XCTAssertTrue(
-            whole.allCells.contains(CellAddress(sheet: "Model", ref: "A1")),
-            "labels still counted")
-        XCTAssertTrue(
-            whole.allCells.contains(CellAddress(sheet: "Other", ref: "C1")),
-            "every sheet still walked")
-        XCTAssertTrue(
-            whole.allCells.contains(CellAddress(sheet: "Model", ref: "B9")),
-            "and a referenced empty cell is still a node")
+        #expect(whole.allCells.contains(CellAddress(sheet: "Model", ref: "A1")), "labels still counted")
+        #expect(whole.allCells.contains(CellAddress(sheet: "Other", ref: "C1")), "every sheet still walked")
+        #expect(whole.allCells.contains(CellAddress(sheet: "Model", ref: "B9")), "and a referenced empty cell is still a node")
     }
 }
