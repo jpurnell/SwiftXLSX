@@ -7,6 +7,30 @@
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-09-19
+
+### Fixed
+
+- **`1:1` — a whole row written without `$` — never parsed, and the code to parse it was
+  already there.** `parsePrimary` matched `case .number(let value)` first and returned the
+  number; the guarded `case .number(let value) where rowIndex(of: value) != nil && peek ==
+  .colon` sat *below* it, and a `switch` takes the first case that matches. `1:1` lexed as a
+  number, matched the plain case, and the colon became `unexpectedToken`. The whole-row
+  branch had a doc comment explaining the rule it implements and could never run.
+
+  Moved above the plain case, with the ordering requirement written down beside it. A number
+  that is not followed by a row pair rewinds and parses as a number, so arithmetic is
+  untouched.
+
+  The `$3:$3` form was unaffected throughout — it lexes as `.rowRef`, a different case
+  entirely — which is why this survived: the absolute spelling worked, and the shorthand's
+  failure looked like a feature nobody had written yet.
+
+  Found from the other end. `COLUMNS(1:1)` is a conformance question in SwiftExcelFunctions,
+  and it could not be written into the workbook to *ask* Excel — the emit step reported "could
+  not parse, writing it as text instead" for seven rounds, and the row was dismissed each time
+  as a harness artifact.
+
 ## [0.29.0] - 2026-09-17
 
 ### Fixed

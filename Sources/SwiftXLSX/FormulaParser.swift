@@ -266,6 +266,30 @@ private struct TokenParser {
         let token = currentToken
 
         switch token {
+        // **Before the plain number case, and that is the whole point.** A `switch` takes
+        // the first case that matches, so while this sat below `case .number(let value)` it
+        // could never run: `1:1` lexed as a number, matched there, and the colon became a
+        // parse error. The support was written, reviewed and dead.
+        //
+        // `1:1` is a whole row written without `$`. A bare number lexes as a number, so the
+        // parser recognises the *pair* rather than the lexer recognising either half — the
+        // same rule as `A:A`, where a lone `A` could be a defined name.
+        case .number(let value) where TokenParser.rowIndex(of: value) != nil && peek == .colon:
+            let saved = position
+            advance()
+            advance()
+            if let firstRow = TokenParser.rowIndex(of: value),
+               case .number(let lastValue) = currentToken,
+               let lastRow = TokenParser.rowIndex(of: lastValue) {
+                advance()
+                return .cellRange(TokenParser.rowSpan(from: firstRow, to: lastRow))
+            }
+            // Not a row pair after all — `1:` with something else behind it. Rewound so the
+            // number parses as a number and the colon fails where it would have anyway.
+            position = saved
+            advance()
+            return .number(value)
+
         case .number(let value):
             advance()
             return .number(value)
@@ -285,18 +309,6 @@ private struct TokenParser {
         case .cellRef(let ref):
             advance()
             return try parseCellRefOrRange(ref)
-
-        case .number(let value) where TokenParser.rowIndex(of: value) != nil && peek == .colon:
-            guard let firstRow = TokenParser.rowIndex(of: value) else { break }
-            let saved = position
-            advance()
-            advance()
-            if case .number(let lastValue) = currentToken,
-               let lastRow = TokenParser.rowIndex(of: lastValue) {
-                advance()
-                return .cellRange(TokenParser.rowSpan(from: firstRow, to: lastRow))
-            }
-            position = saved
 
         case .columnRef, .rowRef:
             let start = currentToken
