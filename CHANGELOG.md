@@ -7,6 +7,25 @@
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-09-19
+
+### Fixed
+
+- **A data validation over a whole column applied to one cell.** `WorksheetParser` builds
+  ranges with `CellRange(_: String)`, which read `A:A` as `A1` and `3:3` as a range in column
+  **zero**. Four attributes read out of real files go through it — an array formula's `ref`,
+  `autoFilter`, `mergeCell`, and a validation's `sqref` — and a validation over a whole column
+  is ordinary. Fixed in SwiftExcelCore **0.14.0**, which this now requires.
+
+### Changed
+
+- **`DefinedNameResolver.wholeSpan` delegates to `CellRange.wholeSpan(from:to:)`** instead of
+  carrying its own copy of the rule. The copy here was the **correct** one — which is why
+  whole-column defined names round-tripped across 161,901 of them while `CellRange(_:)` was
+  answering `A1`, and why the defect went unfound: the path that mattered most had quietly
+  been fixed already, somewhere else. One rule, one place, and the place is the type the rule
+  is about.
+
 ## [0.31.0] - 2026-09-19
 
 ### Added

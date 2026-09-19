@@ -344,6 +344,52 @@ final class WorksheetParserTests: XCTestCase {
         }
     }
 
+    /// A validation over a **whole column**, which is ordinary in a real workbook.
+    ///
+    /// `CellRange(_: String)` used to split on the colon and read `A:A` as the single cell
+    /// `A1`, so a validation applied to a column came back applied to one cell. Fixed in
+    /// SwiftExcelCore 0.14.0; this is the reader path that made it matter rather than a
+    /// cosmetic issue.
+    func testAValidationOverAWholeColumn() throws {
+        let data = makeFullWorksheetXML(
+            sheetData: "",
+            after: """
+            <dataValidations count="1">
+              <dataValidation type="list" sqref="A:A" allowBlank="1">
+                <formula1>"Yes,No"</formula1>
+              </dataValidation>
+            </dataValidations>
+            """)
+        let sheet = try parseSheet(data: data)
+        XCTAssertEqual(sheet.validations.count, 1)
+        let range = sheet.validations[0].range
+        XCTAssertEqual(range.start.column, 1)
+        XCTAssertEqual(range.start.row, 1)
+        XCTAssertEqual(range.end.column, 1)
+        XCTAssertEqual(range.end.row, CellRef.lastOnSheet.row,
+                       "a validation on a column applies to the column")
+    }
+
+    /// A validation over a **whole row**, which used to land in column zero.
+    func testAValidationOverAWholeRow() throws {
+        let data = makeFullWorksheetXML(
+            sheetData: "",
+            after: """
+            <dataValidations count="1">
+              <dataValidation type="list" sqref="3:3" allowBlank="1">
+                <formula1>"Yes,No"</formula1>
+              </dataValidation>
+            </dataValidations>
+            """)
+        let sheet = try parseSheet(data: data)
+        XCTAssertEqual(sheet.validations.count, 1)
+        let range = sheet.validations[0].range
+        XCTAssertGreaterThanOrEqual(range.start.column, 1, "columns are 1-based")
+        XCTAssertEqual(range.start.row, 3)
+        XCTAssertEqual(range.end.column, CellRef.lastOnSheet.column)
+        XCTAssertEqual(range.end.row, 3)
+    }
+
     // 24. Decimal validation
     func testDecimalValidation() throws {
         let data = makeFullWorksheetXML(

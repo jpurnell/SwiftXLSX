@@ -1,5 +1,5 @@
 {
-  "originHash" : "d5d55d8dca1c65a2611220d283800ada906ae805a7b681745317ac2d25f45571",
+  "originHash" : "28396f4359e43ea559b220c82d335d656c5075e02e5669917df9ffd9dee3a570",
   "pins" : [
     {
       "identity" : "swift-docc-plugin",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftExcelCore",
       "state" : {
-        "revision" : "99aa4e50c4eba4f5b2d70b0924a50ce80b97b701",
-        "version" : "0.13.0"
+        "revision" : "372bba9cc09472b038a52374e7546e2e36907137",
+        "version" : "0.14.0"
       }
     },
     {

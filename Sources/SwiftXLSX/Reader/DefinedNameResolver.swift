@@ -86,49 +86,20 @@ enum DefinedNameResolver {
     /// both, and both were unreadable here because ``isReference(_:)`` requires a letter
     /// *and* a digit in each half — `$D` has no digit and `$3` has no letter.
     ///
-    /// The absolute markers are carried through, so the range remembers it was written
-    /// `$D:$D` rather than `D:D` and a writer can put back what it read.
+    /// **Delegates to `CellRange.wholeSpan(from:to:)` as of SwiftExcelCore 0.14.0.** This
+    /// used to carry its own copy of the rule, and it was the *correct* copy: `CellRange`'s
+    /// own string initialiser split on the colon and handed each half to `CellRef`, which
+    /// read `A:A` as the single cell `A1` and `1:1` as a range in column zero. Defined names
+    /// round-tripped across 161,901 of them precisely because they never went through that
+    /// path — which is also why nobody found it. One rule, one place, and the place is the
+    /// type the rule is about.
     ///
     /// - Parameters:
     ///   - start: The half before the colon.
     ///   - end: The half after it.
     /// - Returns: The range, or `nil` when the pair is not a whole span.
     private static func wholeSpan(_ start: Substring, _ end: Substring) -> NamedRangeTarget? {
-        if let first = columnNumber(start), let last = columnNumber(end) {
-            return .range(CellRange(
-                from: CellRef(column: first, row: 1,
-                              absoluteColumn: start.hasPrefix("$"), absoluteRow: false),
-                to: CellRef(column: last, row: CellRef.lastOnSheet.row,
-                            absoluteColumn: end.hasPrefix("$"), absoluteRow: false)))
-        }
-        if let first = rowNumber(start), let last = rowNumber(end) {
-            return .range(CellRange(
-                from: CellRef(column: 1, row: first,
-                              absoluteColumn: false, absoluteRow: start.hasPrefix("$")),
-                to: CellRef(column: CellRef.lastOnSheet.column, row: last,
-                            absoluteColumn: false, absoluteRow: end.hasPrefix("$"))))
-        }
-        return nil
-    }
-
-    /// A fragment that is nothing but a column, as its number.
-    private static func columnNumber(_ fragment: Substring) -> Int? {
-        let letters = fragment.drop { $0 == "$" }
-        guard !letters.isEmpty, letters.allSatisfy({ $0.isLetter }) else { return nil }
-        var number = 0
-        for letter in letters.uppercased().unicodeScalars {
-            guard let value = letter.value as UInt32?, value >= 65, value <= 90 else { return nil }
-            number = number * 26 + Int(value - 64)
-        }
-        return number <= CellRef.lastOnSheet.column ? number : nil
-    }
-
-    /// A fragment that is nothing but a row, as its number.
-    private static func rowNumber(_ fragment: Substring) -> Int? {
-        let digits = fragment.drop { $0 == "$" }
-        guard !digits.isEmpty, digits.allSatisfy({ $0.isNumber }), let number = Int(digits)
-        else { return nil }
-        return (1...CellRef.lastOnSheet.row).contains(number) ? number : nil
+        CellRange.wholeSpan(from: start, to: end).map { .range($0) }
     }
 
     /// Whether a fragment is an `A1`-style reference and nothing else.
