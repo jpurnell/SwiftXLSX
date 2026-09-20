@@ -54,6 +54,11 @@ public final class Workbook: @unchecked Sendable {
         let parsed = try WorkbookReader.read(from: data)
         replaceSheets(parsed.sheets)
         namedRanges = parsed.namedRanges
+        // Carried across explicitly, like the two above. The reader populates a workbook of
+        // its own and this initializer copies from it field by field, so anything the reader
+        // learns and this line does not mention is silently lost — which is exactly what
+        // happened to the pivot tables: parsed correctly, adopted correctly, dropped here.
+        pivotTables = parsed.pivotTables
     }
 
     /// Replaces the current sheets with the given array.

@@ -7,6 +7,20 @@
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-09-20
+
+### Fixed
+
+- **`Workbook(xlsxData:)` dropped the pivot tables it had just read.** The reader populates a
+  workbook of its own and the initializer copies from it field by field — `replaceSheets`,
+  then `namedRanges` — so anything the reader learns and that list does not mention is
+  silently lost. The parser was correct, the adoption was correct, and
+  `Workbook.pivotTables` came back empty for every file.
+
+  Found by probing a real workbook: 52 sheets, 38 sheet relationships naming a pivot, each
+  part resolving and parsing correctly in isolation, and zero pivots on the workbook. Every
+  piece worked and the assembly did not.
+
 ## [0.33.0] - 2026-09-20
 
 ### Added
