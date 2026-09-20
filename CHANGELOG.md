@@ -7,6 +7,47 @@
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-09-20
+
+### Changed
+
+- **The test suite runs on Swift Testing.** All 43 files, 847 tests. The project standard is
+  Swift Testing and this suite had never been moved; SwiftZIP's already was, which is how the
+  gap surfaced. No source or public API changed — this is a test-target change only, and
+  consumers see nothing.
+
+  The count is the check, not a statistic: a `func testX` left without `@Test` still compiles
+  and simply stops running, so a silent loss would have looked like success. 847 in 43 suites
+  before, 847 in 43 after.
+
+  Converting the assertions made the suite's real weaknesses visible to the gate, which
+  `XCTAssert*` had been hiding inside calls the auditor cannot see into. Seventeen exact
+  floating-point comparisons were `XCTAssertEqual` on two `Double`s; every one compares a value
+  stored and read back unchanged, so exactness is the actual claim and `.isEqual(to:)` names it.
+  109 tests read as assertion-free because they delegated to a helper holding the assertion; the
+  helpers are gone and each test now asserts at its call site. The remaining 49 weak assertions
+  were strengthened against the sources rather than made to pass — `!= nil` became equality
+  against the value the test actually wrote, and the Sendable tests, which previously proved
+  conformance only by compiling, now send a value across a task boundary and assert it arrives
+  unchanged.
+
+### Documentation
+
+- **README and `project/master_plan.md` reconciled against what the package actually is.**
+  Both still described the package as it stood before 0.13.0. The README advertised
+  "Formula Evaluation" and "62 Built-in Functions" as headline features and called SwiftZIP
+  "the only package dependency"; the master plan listed `FormulaEvaluator`,
+  `FunctionRegistry`, `ExcelFunction` and `EvalError` in its type table alongside the whole
+  SwiftExcelCore vocabulary, so about half that table named types this package no longer
+  defines.
+
+  None of it was wrong when written — it went stale in 0.12.0 and 0.13.0 and nothing
+  recompiles a README. Corrected here rather than at the next feature release, since a
+  front page promising an evaluator that left seven months of releases ago is the kind of
+  error a new consumer hits first. File and test counts updated with it (49 source / 49 test
+  / ~1414 tests -> 35 / 43 / 847), and the drop recorded as what it was: 170 tests to
+  SwiftExcelCore and 546 to SwiftExcelFunctions with the code they cover, none deleted.
+
 ## [0.31.1] - 2026-09-19
 
 ### Fixed

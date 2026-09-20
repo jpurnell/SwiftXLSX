@@ -1,15 +1,19 @@
 # SwiftXLSX
 
-Pure-Swift library for generating and evaluating Excel (.xlsx) files. No C or system-library
-dependencies, and nothing shells out to an external binary.
+Pure-Swift library for reading and writing Excel (.xlsx) files — formulas, styles and layout.
+No C or system-library dependencies, and nothing shells out to an external binary.
+
+Formula **evaluation** lives in a separate package. This one is syntax and storage: it parses,
+serializes, reads and writes. To compute results, add
+[SwiftExcelFunctions](https://github.com/jpurnell/SwiftExcelFunctions).
 
 ## Features
 
 - **Formula AST** — represent Excel formulas as a recursive expression tree
 - **Formula Parser** — parse Excel formula strings (`=SUM(A1:B5)/12`) into AST trees
-- **Formula Evaluation** — compute formula results natively in Swift, no Excel required
-- **62 Built-in Functions** — Math, Stats, Financial (PMT, NPV, IRR), Logical, Text, Lookup, Date, Aggregation
-- **Dependency Graph** — topological sort, cycle detection, impact analysis
+- **Formula Serializer** — AST back to an Excel formula string, with precedence-aware parens
+- **Dependency Graph** — topological sort, cycle detection, impact analysis (the type lives in
+  SwiftExcelCore; this package builds one from a `Workbook` or `Worksheet`)
 - **Named Ranges** — Excel's variable system as first-class AST nodes
 - **Rich Styling** — composed `CellStyle` with `Font`, `Border`, `Alignment`, `NumberFormat`, `Fill` and builder pattern
 - **Design Bundles** — configurable default styling (SF Mono, SF Pro Display, gutter columns)
@@ -64,8 +68,16 @@ let value = firstSheet.cell(at: "A1")  // CellValue?
 - Swift 6.2+
 - macOS 14+ / iOS 17+
 
-The only package dependency is [SwiftZIP](https://github.com/jpurnell/SwiftZIP) 0.6.0+ (pure
-Swift), which provides the ZIP reader and writer. `swift-docc-plugin` is a build-time plugin only.
+Two package dependencies, both pure Swift:
+
+- [SwiftZIP](https://github.com/jpurnell/SwiftZIP) 0.6.0+ — the ZIP reader and writer.
+- [SwiftExcelCore](https://github.com/jpurnell/SwiftExcelCore) 0.14.0+ — the shared spreadsheet
+  vocabulary (`CellValue`, `CellRef`, `CellRange`, `FormulaAST`, `ExcelError`, `NamedRange`,
+  `DependencyGraph`). It is re-exported, so `import SwiftXLSX` sees those types with no second
+  import, and it is pinned `from:` rather than `exact:` so SwiftPM can unify it across the
+  packages that share it.
+
+`swift-docc-plugin` is a build-time plugin only.
 
 ## License
 
