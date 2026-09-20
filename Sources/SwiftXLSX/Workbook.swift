@@ -20,6 +20,13 @@ public final class Workbook: @unchecked Sendable {
     /// sheet-scoped name taking precedence over a workbook-scoped one of the same
     /// spelling.
     public private(set) var namedRanges = NamedRangeCollection()
+
+    /// The pivot tables this workbook renders, in the order the sheets were read.
+    ///
+    /// **Positions and column names, never values.** A pivot's numbers are already written
+    /// into cells and cached there, so `GETPIVOTDATA` reads them back off the sheet; these
+    /// layouts only say which table a formula means and where its columns are.
+    public private(set) var pivotTables: [PivotTableLayout] = []
     let sharedStrings = SharedStrings()
     let styleSheet = StyleSheet()
 
@@ -61,6 +68,13 @@ public final class Workbook: @unchecked Sendable {
     /// - Parameter range: The named range to record.
     func adopt(_ range: NamedRange) {
         namedRanges.add(range)
+    }
+
+    /// Records a pivot table layout read from a file.
+    ///
+    /// - Parameter layout: Where the table sits and what its data fields are called.
+    func adopt(_ layout: PivotTableLayout) {
+        pivotTables.append(layout)
     }
 
     /// Defines a name in this workbook.

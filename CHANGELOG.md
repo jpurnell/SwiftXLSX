@@ -7,6 +7,39 @@
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-09-20
+
+### Added
+
+- **Pivot table definitions are read**, for `GETPIVOTDATA`. Per table: the `location ref`, the
+  `firstDataRow`/`firstDataCol` offsets, the `dataField` names in order, and the two
+  grand-total flags. `Workbook.pivotTables` exposes them and `WorkbookValueProvider` answers
+  `CellValueProvider.pivotTables()`.
+
+  **`xl/pivotCache/` is never opened.** A pivot table's values are already rendered onto the
+  worksheet and cached there like any other formula result, so `GETPIVOTDATA` is a lookup into
+  a rendered table rather than a recomputation — it aggregates nothing. One corpus workbook
+  carries **76 cache parts** and needs none of them; the parser takes five attributes out of a
+  definition that is typically 5 KB and ignores the rest.
+
+  **An absent grand-total attribute means the total is rendered.** The format defaults both
+  flags to on, so a reader treating "missing" as `false` would lose the row `GETPIVOTDATA`
+  asks for most often.
+
+  The grand total is the last row of `ref` when `rowGrandTotals` is on — never a row matching
+  the label `"Grand Total"`. Measured: a pivot in `Dot Com YTD Performance Report 6 20.xlsx`
+  with `rowGrandTotals="0"` ends on a row reading **`"KEY Total"`**, a *subtotal*, which a
+  label match would have taken for a grand total and reported quietly. Reading the attributes
+  avoids that and the locale trap beside it — the same label is `"Gesamtergebnis"` in German.
+
+- **`WorkbookValueProvider.sheetNames()`**, so a 3-D reference — `SUM('Q1:Q4'!B7)` — resolves
+  against a workbook read from a file. The provider had the sheets all along and no way to say
+  their order.
+
+### Changed
+
+- Requires SwiftExcelCore 0.16.0 for `PivotTableLayout`.
+
 ## [0.32.0] - 2026-09-20
 
 ### Changed

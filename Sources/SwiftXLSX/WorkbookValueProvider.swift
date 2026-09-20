@@ -28,6 +28,12 @@ public struct WorkbookValueProvider: CellValueProvider, @unchecked Sendable {
         self.currentSheet = currentSheet
     }
 
+    /// The workbook's sheets, in file order, so a 3-D reference can be expanded.
+    public func sheetNames() -> [String] { workbook.sheets.map(\.name) }
+
+    /// The pivot tables the workbook renders, for `GETPIVOTDATA`.
+    public func pivotTables() -> [PivotTableLayout] { workbook.pivotTables }
+
     /// Returns the cell value at the given reference in the current sheet.
     public func value(at ref: CellRef) -> CellValue? {
         value(at: ref, inSheet: currentSheet)

@@ -118,6 +118,31 @@ enum WorkbookReader {
             try WorksheetParser.parse(data: sheetData, into: sheet,
                                        sharedStrings: sharedStrings, styles: styles,
                                        phonetics: phonetics)
+
+            // A sheet's own relationships say which pivot tables it renders. Read for
+            // `GETPIVOTDATA`, which looks a value up in a table already on the sheet rather
+            // than recomputing one — so the definitions are wanted and `xl/pivotCache/` is
+            // not. A sheet with no pivots costs one dictionary miss.
+            let sheetDir = sheetPath.contains("/")
+                ? sheetPath.components(separatedBy: "/").dropLast().joined(separator: "/")
+                : ""
+            let sheetFile = sheetPath.components(separatedBy: "/").last ?? sheetPath
+            let sheetRelsPath = sheetDir.isEmpty
+                ? "_rels/\(sheetFile).rels"
+                : "\(sheetDir)/_rels/\(sheetFile).rels"
+            guard let sheetRelsData = entryMap[sheetRelsPath],
+                  let sheetRels = try? RelationshipsParser.parse(data: sheetRelsData) else {
+                continue
+            }
+            for relationship in sheetRels where relationship.type.hasSuffix("/pivotTable") {
+                let partPath = resolvePart(relationship.target, relativeTo: sheetDir)
+                guard let partData = entryMap[partPath],
+                      let layout = PivotTableParser.parse(data: partData, onSheet: info.name)
+                else {
+                    continue
+                }
+                workbook.adopt(layout)
+            }
         }
 
         return workbook
