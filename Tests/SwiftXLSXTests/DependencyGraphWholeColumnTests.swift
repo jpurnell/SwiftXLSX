@@ -71,23 +71,41 @@ struct DependencyGraphWholeColumnTests {
         #expect(precedents.map(\.cell.reference) == ["A3"])
     }
 
-    @Test("A whole column range parses to the full column")
+    /// **These assertions used to omit the `$`, and that was the bug.**
+    ///
+    /// They compared against `CellRef(column: 5, row: 1)` — column-*relative* — and passed,
+    /// because the lexer stripped the `$` before the parser ever saw it. A shared formula
+    /// whose master pins `$BE:$BE` then moved that column with every copy: 120 cells of
+    /// `Display vs Paid Performance Excel.xlsx` read `0` where Excel had a number, the
+    /// criteria having been walked six columns onto unrelated data.
+    @Test("A whole column range parses to the full column, keeping its $")
     func testAWholeColumnRangeParsesToTheFullColumn() throws {
         guard case .cellRange(let range) = try FormulaParser.parse("$E:$E") else {
             Issue.record("expected a range")
             return
         }
-        #expect(range.start == CellRef(column: 5, row: 1))
-        #expect(range.end == CellRef(column: 5, row: 1_048_576))
+        #expect(range.start == CellRef(column: 5, row: 1, absoluteColumn: true))
+        #expect(range.end == CellRef(column: 5, row: 1_048_576, absoluteColumn: true))
     }
 
-    @Test("A whole row range spans every column")
+    @Test("A whole row range spans every column, keeping its $")
     func testAWholeRowRangeSpansEveryColumn() throws {
         guard case .cellRange(let range) = try FormulaParser.parse("$2:$3") else {
             Issue.record("expected a range")
             return
         }
-        #expect(range.start == CellRef(column: 1, row: 2))
-        #expect(range.end == CellRef(column: 16_384, row: 3))
+        #expect(range.start == CellRef(column: 1, row: 2, absoluteRow: true))
+        #expect(range.end == CellRef(column: 16_384, row: 3, absoluteRow: true))
+    }
+
+    /// The bare forms stay relative, which is how they were written.
+    @Test("A whole column written without a $ stays relative")
+    func testABareWholeColumnStaysRelative() throws {
+        guard case .cellRange(let range) = try FormulaParser.parse("E:E") else {
+            Issue.record("expected a range")
+            return
+        }
+        #expect(!range.start.absoluteColumn)
+        #expect(!range.end.absoluteColumn)
     }
 }

@@ -443,6 +443,12 @@ public enum FormulaLexer {
         let bare = raw.filter { $0 != "$" }
         guard !bare.isEmpty else { return nil }
 
+        // **Whether the `$` was there is part of the reference**, not punctuation to discard.
+        // It decides whether a shared formula's copies move this column, and dropping it here
+        // is what made 120 corpus cells read `0`: a master pinning `$BE:$BE` had that column
+        // walked along with each copy until the criteria pointed at unrelated data.
+        let absolute = raw.contains("$")
+
         if bare.allSatisfy(\.isLetter) {
             var column = 0
             for ch in bare {
@@ -450,12 +456,12 @@ public enum FormulaLexer {
                 column = column * 26 + Int(value - 64)
             }
             guard column >= 1 && column <= 16_384 else { return nil }
-            return .columnRef(column)
+            return .columnRef(column, absolute: absolute)
         }
 
         if bare.allSatisfy(\.isNumber) {
             guard let row = Int(String(bare)), row >= 1 && row <= 1_048_576 else { return nil }
-            return .rowRef(row)
+            return .rowRef(row, absolute: absolute)
         }
 
         return nil

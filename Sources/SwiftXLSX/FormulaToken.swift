@@ -30,11 +30,15 @@ public enum FormulaToken: Equatable, Sendable {
     /// A reference naming a column and no row — the `$E` of `$E:$E`.
     ///
     /// Only ever produced with a `$`, because a bare `E` is indistinguishable
-    /// from a defined name until the parser sees what follows it.
-    case columnRef(Int)
+    /// from a defined name until the parser sees what follows it — so `absolute`
+    /// is always `true` today, and is carried rather than assumed because
+    /// **losing it was a defect**: a shared formula whose master pins `$BE:$BE`
+    /// moved that column with every copy, and 120 corpus cells read `0` where
+    /// Excel had a number.
+    case columnRef(Int, absolute: Bool)
 
     /// A reference naming a row and no column — the `$2` of `$2:$3`.
-    case rowRef(Int)
+    case rowRef(Int, absolute: Bool)
 
     case quotedName(String)
 

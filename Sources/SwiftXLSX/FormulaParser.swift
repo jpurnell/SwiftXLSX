@@ -159,8 +159,8 @@ private struct TokenParser {
         case .cellRef(let r): return "cell(\(r.reference))"
         case .quotedName(let n): return "'\(n)'"
         case .identifier(let n): return "identifier(\(n))"
-        case .columnRef(let c): return "column(\(c))"
-        case .rowRef(let r): return "row(\(r))"
+        case .columnRef(let c, _): return "column(\(c))"
+        case .rowRef(let r, _): return "row(\(r))"
         case .plus: return "+"
         case .minus: return "-"
         case .asterisk: return "*"
@@ -285,7 +285,8 @@ private struct TokenParser {
                case .number(let lastValue) = currentToken,
                let lastRow = TokenParser.rowIndex(of: lastValue) {
                 advance()
-                return .cellRange(TokenParser.rowSpan(from: firstRow, to: lastRow))
+                return .cellRange(TokenParser.rowSpan(
+                from: firstRow, pinned: false, to: lastRow, pinned: false))
             }
             // Not a row pair after all — `1:` with something else behind it. Rewound so the
             // number parses as a number and the colon fails where it would have anyway.
@@ -468,22 +469,38 @@ private struct TokenParser {
     private mutating func parsePartialRange(_ start: FormulaToken) throws -> FormulaAST {
         advance()
         switch (start, currentToken) {
-        case (.columnRef(let first), .columnRef(let last)):
+        case (.columnRef(let first, let firstPinned), .columnRef(let last, let lastPinned)):
             advance()
-            return .cellRange(TokenParser.columnSpan(from: first, to: last))
-        case (.rowRef(let first), .rowRef(let last)):
+            return .cellRange(TokenParser.columnSpan(
+                from: first, pinned: firstPinned, to: last, pinned: lastPinned))
+        case (.rowRef(let first, let firstPinned), .rowRef(let last, let lastPinned)):
             advance()
-            return .cellRange(TokenParser.rowSpan(from: first, to: last))
+            return .cellRange(TokenParser.rowSpan(
+                from: first, pinned: firstPinned, to: last, pinned: lastPinned))
+        // **One end pinned and the other not** — `$BE:BG`, which Excel writes and which the
+        // lexer hands over as two different tokens, since only the half carrying a `$` is
+        // recognisable as a column on its own.
+        case (.columnRef(let first, let firstPinned), .identifier(let name)):
+            guard let last = TokenParser.columnIndex(of: name) else { break }
+            advance()
+            return .cellRange(TokenParser.columnSpan(
+                from: first, pinned: firstPinned, to: last, pinned: false))
+        case (.rowRef(let first, let firstPinned), .number(let value)):
+            guard let last = TokenParser.rowIndex(of: value) else { break }
+            advance()
+            return .cellRange(TokenParser.rowSpan(
+                from: first, pinned: firstPinned, to: last, pinned: false))
         default:
-            throw FormulaParseError(
-                kind: .unexpectedToken(
-                    expected: "a matching column or row reference",
-                    found: describeToken(currentToken)
-                ),
-                offset: position,
-                formula: formula
-            )
+            break
         }
+        throw FormulaParseError(
+            kind: .unexpectedToken(
+                expected: "a matching column or row reference",
+                found: describeToken(currentToken)
+            ),
+            offset: position,
+            formula: formula
+        )
     }
 
     private mutating func parseCellRefOrRange(_ startRef: CellRef) throws -> FormulaAST {
@@ -516,17 +533,29 @@ private struct TokenParser {
     static let lastRow = 1_048_576
 
     /// The range `$E:$G` names.
-    static func columnSpan(from first: Int, to last: Int) -> CellRange {
-        CellRange(
-            from: CellRef(column: min(first, last), row: 1),
-            to: CellRef(column: max(first, last), row: lastRow))
+    ///
+    /// **Each end keeps its own `$`.** Excel pins the two independently — `$BE:BG` is legal —
+    /// and a shared formula moves only the ends that are not pinned. Where the ends are
+    /// written the wrong way round the columns are ordered, and each flag travels with the
+    /// column it was written against rather than with the position it lands in.
+    ///
+    /// The rows are the full span and carry no marker of their own: a whole column already
+    /// names every row, so there is no offset that could change which cells it selects.
+    static func columnSpan(from first: Int, pinned firstPinned: Bool,
+                           to last: Int, pinned lastPinned: Bool) -> CellRange {
+        let ends = [(first, firstPinned), (last, lastPinned)].sorted { $0.0 < $1.0 }
+        return CellRange(
+            from: CellRef(column: ends[0].0, row: 1, absoluteColumn: ends[0].1),
+            to: CellRef(column: ends[1].0, row: lastRow, absoluteColumn: ends[1].1))
     }
 
-    /// The range `$2:$3` names.
-    static func rowSpan(from first: Int, to last: Int) -> CellRange {
-        CellRange(
-            from: CellRef(column: 1, row: min(first, last)),
-            to: CellRef(column: lastColumn, row: max(first, last)))
+    /// The range `$2:$3` names, with each end keeping its own `$`.
+    static func rowSpan(from first: Int, pinned firstPinned: Bool,
+                        to last: Int, pinned lastPinned: Bool) -> CellRange {
+        let ends = [(first, firstPinned), (last, lastPinned)].sorted { $0.0 < $1.0 }
+        return CellRange(
+            from: CellRef(column: 1, row: ends[0].0, absoluteRow: ends[0].1),
+            to: CellRef(column: lastColumn, row: ends[1].0, absoluteRow: ends[1].1))
     }
 
     // MARK: - Identifier Dispatch
@@ -569,7 +598,8 @@ private struct TokenParser {
             if case .identifier(let endName) = currentToken,
                let last = TokenParser.columnIndex(of: endName) {
                 advance()
-                return .cellRange(TokenParser.columnSpan(from: first, to: last))
+                return .cellRange(TokenParser.columnSpan(
+                    from: first, pinned: false, to: last, pinned: false))
             }
             position = saved
         }
@@ -668,7 +698,9 @@ private struct TokenParser {
                    let lastRow = TokenParser.rowIndex(of: lastValue) {
                     advance()
                     return .sheetRef(SheetReference(
-                        sheet: name, range: TokenParser.rowSpan(from: firstRow, to: lastRow)))
+                        sheet: name,
+                        range: TokenParser.rowSpan(
+                            from: firstRow, pinned: false, to: lastRow, pinned: false)))
                 }
             }
             position = saved
@@ -687,7 +719,9 @@ private struct TokenParser {
                     advance()
                     return .sheetRef(SheetReference(
                         sheet: name,
-                        range: TokenParser.columnSpan(from: firstColumn, to: lastColumn)))
+                        range: TokenParser.columnSpan(
+                            from: firstColumn, pinned: false,
+                            to: lastColumn, pinned: false)))
                 }
             }
             position = saved

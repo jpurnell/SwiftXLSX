@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-09-20
+
+### Fixed
+
+- **A shared formula moved columns its master had pinned with `$`.** The lexer stripped the
+  `$` from a whole-column or whole-row reference to read the letters and never recorded that it
+  had been there, so `$BE:$BE` and a bare `BE:BE` reached the parser identically. Every copy of
+  the formula then walked that column along with it.
+
+  Measured in `Display vs Paid Performance Excel.xlsx`, which carries **13,821 shared
+  followers** on one sheet. Its master is
+
+  ```xml
+  <c r="BP11"><f t="shared" ref="BP11:BZ11" si="34">
+    SUMIFS($BE:$BE,$AZ:$AZ,BP$2,$AY:$AY,BP$3)
+  </f></c>
+  <c r="BV11"><f t="shared" si="34"/><v>43375</v></c>
+  ```
+
+  `BV11` is six columns right of the master, so Excel reads the pinned `$BE`, `$AZ` and `$AY`
+  where they are and moves only `BP$2` and `BP$3`. We moved all five, producing criteria
+  columns of page-region names tested against a year of `2013` — matching nothing, so **120
+  cells read `0`** where Excel had a number, in a formula whose every part looked plausible.
+
+  `SharedFormula.shift(_:rowDelta:columnDelta:)` honoured `absoluteColumn` correctly the whole
+  time. It was never told. `FormulaToken.columnRef` and `.rowRef` now carry the marker, and
+  each end of a span keeps its own — Excel pins them independently.
+
+  Two existing tests asserted the wrong behaviour and passed: they compared `$E:$E` against a
+  column-*relative* `CellRef`. They now assert the `$`, with a third covering the bare form.
+
+### Added
+
+- **`$BE:BG` parses** — one end pinned and the other not, which Excel writes and which was
+  rejected outright before, because only the half carrying a `$` is recognisable as a column on
+  its own. The same for `$2:3`.
+
+
 ## [0.34.0] - 2026-09-20
 
 > **This entry landed one commit after the tag.** It was written by a script that failed its
