@@ -17,7 +17,7 @@ let package = Package(
         // SwiftExcelCore versions would mean two `CellValue` types and nothing would
         // typecheck. `from:` lets it pick the highest that satisfies everyone; `exact:`
         // made the family unresolvable whenever Core moved ahead of one consumer.
-        .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.14.0"),
+        .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.17.0"),
     ],
     targets: [
         .target(

@@ -41,8 +41,12 @@ enum PivotTableParser {
     /// - Parameters:
     ///   - data: The bytes of an `xl/pivotTables/pivotTableN.xml` part.
     ///   - sheet: The sheet the table is rendered on.
+    ///   - cacheFields: The names from the pivot's cache definition, in order, which is what
+    ///     the indices in this part count in. Pass `[]` where the cache could not be read: the
+    ///     axes then come back empty and the two-argument form still works off the captions.
     /// - Returns: The layout, or `nil` where the part carries no usable location.
-    static func parse(data: Data, onSheet sheet: String) -> PivotTableLayout? {
+    static func parse(data: Data, onSheet sheet: String,
+                      cacheFields: [String] = []) -> PivotTableLayout? {
         guard let xml = String(data: data, encoding: .utf8) else { return nil }
         guard let location = element(named: "location", in: xml),
               let reference = attribute("ref", of: location),
@@ -55,22 +59,100 @@ enum PivotTableParser {
         let firstDataRow = attribute("firstDataRow", of: location).flatMap(Int.init) ?? 0
         let firstDataCol = attribute("firstDataCol", of: location).flatMap(Int.init) ?? 0
 
-        var fields: [String] = []
+        // `firstHeaderRow` is its own attribute. It equals `firstDataRow - 1` on every pivot
+        // measured so far, which is exactly why it must not be derived from it.
+        let firstHeaderRow = attribute("firstHeaderRow", of: location).flatMap(Int.init) ?? 0
+        let pageRows = attribute("rowPageCount", of: location).flatMap(Int.init) ?? 0
+
+        var captions: [String] = []
+        var sources: [String] = []
         for element in elements(named: "dataField", in: xml) {
-            guard let name = attribute("name", of: element) else { continue }
-            fields.append(name)
+            guard let caption = attribute("name", of: element) else { continue }
+            captions.append(caption)
+            // The **source** field, which is the other name Excel answers to: the corpus asks
+            // for `"Subs"` against a caption of `"Sum of Subs"`. Empty where the index cannot
+            // be resolved, leaving the caption as the only route in rather than inventing one.
+            let index = attribute("fld", of: element).flatMap(Int.init)
+            sources.append(name(at: index, in: cacheFields) ?? "")
         }
 
         return PivotTableLayout(
             sheet: sheet,
             range: range,
+            firstHeaderRow: firstHeaderRow,
             firstDataRow: firstDataRow,
             firstDataCol: firstDataCol,
-            dataFields: fields,
+            dataFields: captions,
+            dataFieldSources: sources,
+            rowFields: axis(named: "rowFields", in: xml, cacheFields: cacheFields),
+            columnFields: axis(named: "colFields", in: xml, cacheFields: cacheFields),
+            pageFields: pageAxis(in: xml, cacheFields: cacheFields),
+            pageFieldRowCount: pageRows,
             // **Absent means present.** The file format defaults both to on, so a missing
             // attribute is a rendered total rather than the reverse.
             hasRowGrandTotals: flag("rowGrandTotals", in: xml) ?? true,
             hasColumnGrandTotals: flag("colGrandTotals", in: xml) ?? true)
+    }
+
+    // MARK: - The axes
+
+    /// One axis, resolved from indices to names.
+    ///
+    /// **`-2` is the values pseudo-field**, not index -2 of anything: it marks where the data
+    /// field names are rendered. Resolving it through the name list would read off the end.
+    /// Any other index the cache cannot name is **dropped rather than invented** — a layout
+    /// claiming four row fields whose names match nothing describes a table that does not
+    /// exist, and would put the label columns out by one.
+    private static func axis(named name: String, in xml: String,
+                             cacheFields: [String]) -> [PivotAxisField] {
+        guard let body = body(of: name, in: xml) else { return [] }
+        var fields: [PivotAxisField] = []
+        for element in elements(named: "field", in: body) {
+            guard let index = attribute("x", of: element).flatMap(Int.init) else { continue }
+            if index == Self.valuesPseudoField {
+                fields.append(.dataFieldNames)
+                continue
+            }
+            guard let resolved = self.name(at: index, in: cacheFields) else { continue }
+            fields.append(.field(resolved))
+        }
+        return fields
+    }
+
+    /// The page (filter) fields, which are indexed by `fld` rather than `x` and never carry
+    /// the pseudo-field — the data field names are not a filter.
+    private static func pageAxis(in xml: String, cacheFields: [String]) -> [String] {
+        guard let body = body(of: "pageFields", in: xml) else { return [] }
+        var fields: [String] = []
+        for element in elements(named: "pageField", in: body) {
+            guard let index = attribute("fld", of: element).flatMap(Int.init),
+                  let resolved = name(at: index, in: cacheFields) else { continue }
+            fields.append(resolved)
+        }
+        return fields
+    }
+
+    /// The index the file writes where an axis entry is the data field names rather than a
+    /// field of the source data.
+    private static let valuesPseudoField = -2
+
+    /// A cache field's name, or `nil` where the index names none.
+    private static func name(at index: Int?, in cacheFields: [String]) -> String? {
+        guard let index, index >= 0, index < cacheFields.count else { return nil }
+        return cacheFields[index]
+    }
+
+    /// The text between an element's opening and closing tags.
+    private static func body(of name: String, in xml: String) -> String? {
+        guard let open = xml.range(of: "<\(name) ") ?? xml.range(of: "<\(name)>") else {
+            return nil
+        }
+        let rest = xml[open.lowerBound...]
+        guard let start = rest.range(of: ">"), let end = rest.range(of: "</\(name)>") else {
+            return nil
+        }
+        guard start.upperBound <= end.lowerBound else { return nil }
+        return String(rest[start.upperBound..<end.lowerBound])
     }
 
     // MARK: - Reading the pieces
