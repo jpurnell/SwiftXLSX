@@ -7,6 +7,58 @@
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-09-20
+
+> **This entry landed one commit after the tag.** It was written by a script that failed its
+> own assertion, in the same shell statement that cut and pushed `v0.34.0` — and nothing
+> between them stopped on the failure. The tag points at the right code; it just does not
+> contain the note describing it. Recorded rather than rewritten, since the tag was already
+> pushed.
+
+### Added
+
+- **The pivot axes, resolved to names**, which is what `GETPIVOTDATA`'s field/item pairs need.
+  `PivotTableParser` now reads `rowFields`, `colFields`, `pageFields`, `firstHeaderRow`,
+  `rowPageCount`, and each data field's source field — and `PivotCacheParser` reads the names
+  those indices count in.
+
+  **`xl/pivotCache/` is opened, and the original insight survives intact.** Field identity in
+  a pivot table definition is positional — `<field x="4"/>`, `fld="11"`, `<pageField fld="9"/>`
+  — and only `pivotCacheDefinition*.xml` carries `<cacheField name="…"/>`. The distinction is
+  **definitions versus records**: in the corpus workbook that is 7 definition parts of
+  0.8–12 KB read for a list of strings, against 2 record parts never opened. Nothing is
+  aggregated; the values still come off the worksheet where Excel rendered them. Definitions
+  are shared — 50 pivots behind 7 caches — so each is read once per workbook.
+
+  `<field x="-2"/>` becomes `PivotAxisField.dataFieldNames` rather than an index: it marks
+  where the data field *names* are rendered, and 15 of the corpus workbook's 50 pivots carry
+  it. An index the cache cannot name is **dropped, not invented** — a layout claiming four row
+  fields whose names match nothing describes a table that does not exist and would put the
+  label columns out by one.
+
+  Verified against the file rather than only against fixtures: 50 pivots, 15 with the
+  pseudo-field, 40 with page fields, 0 with an unresolved row axis, every figure matching an
+  independent count from the raw XML. That check is here because the last pivot feature parsed
+  correctly, adopted correctly, and shipped inert.
+
+- **`RelationshipsParser.declaredRelationships(data:)`** — the relationships a part declares,
+  where a part that cannot be read declares none. Used only where the question is optional
+  (which pivots a sheet renders, which cache backs a pivot); the workbook's own `.rels` still
+  throws, because a package unreadable there has no sheets and an empty workbook would be a
+  lie about the file.
+
+### Fixed
+
+- **Two `try?` discards in the reader**, replaced rather than annotated. Both parsed a `.rels`
+  part and threw the error away; the failure is now produced as a value once and each caller
+  decides what it means. Gate back to 0 warnings.
+
+### Changed
+
+- Requires SwiftExcelCore **0.17.0** for `PivotAxisField` and the axis-carrying
+  `PivotTableLayout`.
+
+
 ## [0.33.1] - 2026-09-20
 
 ### Fixed
