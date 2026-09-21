@@ -92,4 +92,25 @@ public struct WorkbookValueProvider: CellValueProvider, @unchecked Sendable {
         }
         return sheet.values(in: range)
     }
+
+    /// Whether a cell's formula was array-entered — `<f t="array" ref="…">` in the file.
+    ///
+    /// The reader already records each array formula's **anchor and span**, because a member
+    /// of the span is computed by its anchor rather than independently. Both the anchor and
+    /// the members are array-entered, so containment is the test rather than identity.
+    ///
+    /// - Parameters:
+    ///   - ref: The cell to ask about.
+    ///   - sheet: The sheet it sits on.
+    /// - Returns: `true` where the cell falls in an array formula's span.
+    public func isArrayEntered(at ref: CellRef, inSheet sheet: String) -> Bool {
+        guard let worksheet = workbook.sheets.first(where: { $0.name == sheet }) else {
+            return false
+        }
+        return worksheet.arrayFormulas.contains { formula in
+            ref.row >= formula.span.start.row && ref.row <= formula.span.end.row
+                && ref.column >= formula.span.start.column
+                && ref.column <= formula.span.end.column
+        }
+    }
 }

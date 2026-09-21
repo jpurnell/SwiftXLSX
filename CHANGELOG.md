@@ -7,6 +7,25 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-09-21
+
+### Added
+
+- **`WorkbookValueProvider.isArrayEntered(at:inSheet:)`** — whether a cell's formula was
+  entered with `Ctrl`+`Shift`+`Enter`. The reader already recorded each array formula's anchor
+  and span, because a member of the span is computed by its anchor rather than independently;
+  this exposes that fact where an evaluator can reach it. Members count as array-entered along
+  with the anchor, so containment is the test rather than identity.
+
+  It matters because it picks between two readings of one formula text: array-entered, a range
+  means the whole range; normally entered, Excel implicitly intersects it against the formula's
+  own row or column wherever a single value is expected.
+
+### Changed
+
+- Requires SwiftExcelCore **0.19.0**.
+
+
 ## [0.35.0] - 2026-09-20
 
 ### Fixed
