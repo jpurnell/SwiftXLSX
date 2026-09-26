@@ -98,6 +98,10 @@ enum WorkbookReader {
         // ``Workbook/init(xlsxData:)`` would be wasted work and a second chance to fail at
         // something that has just succeeded.
         workbook.adopt(origin: entries)
+        // The table itself, not just the strings the sheets needed. A cell holds an *index*
+        // into it, so a writer that starts from an empty table hands the first string it is
+        // given index 0 — which this file already uses for something else.
+        workbook.sharedStrings.adopt(sharedStrings)
 
         // Cache definitions are **shared**: 50 pivots in one corpus workbook are backed by 7
         // definitions, and one of them answers for 29 of the tables. Read each part once.

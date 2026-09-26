@@ -9,6 +9,29 @@
 
 ### Changed
 
+- **An edited sheet is now spliced, not regenerated.** Step 4 of
+  `project/plans/proposals/PROPOSAL_surgical_save.md`, and the end of the arc: step 3 stopped an
+  edit costing the workbook, and this stops it costing the sheet.
+
+  `WorksheetSplicer` edits the `<c>` elements whose cells changed in the sheet's own XML and
+  leaves every other byte where it was — so conditional formatting, hyperlinks, page setup,
+  sheet protection, `<sheetPr>`, row heights and the `<drawing r:id=…>` anchor all survive an
+  edit. The anchor matters most: without it the chart part stays in the archive with nothing
+  pointing at it, and the file opens cleanly with a picture missing.
+
+  Measured on a real 1.6 MB sheet, writing one cell: **22 bytes changed, two parts touched**,
+  and 4,063 shared-formula cells and 304 error cells came through untouched. Before this the
+  whole sheet was rebuilt.
+
+  It also means the index tables usually are not written at all. A splice reuses the style and
+  string indices already in the file and only appends when a genuinely new string has to go on
+  the end, which is §3.3's append-only rule arriving for free.
+
+  Refused rather than guessed at, because each would break a cell the caller never touched:
+  editing the **master** of a shared formula (its followers carry only its `si`), editing the
+  **anchor** of an array formula (its span would be left stale), and adding a **styled** new
+  cell (see below).
+
 - **`save()` no longer destroys the file it was read from.** A workbook read with
   `Workbook(xlsxData:)` or `Workbook(contentsOf:)` is now written by putting its own archive
   back and substituting only what an edit made wrong. One composed in code is written from the
@@ -72,6 +95,24 @@
   already has.
 
 ### Fixed
+
+- **A text value written into a workbook that was read no longer relabels an unrelated cell.**
+  A cell holds an *index* into the shared string table, not the string. The reader parsed
+  `xl/sharedStrings.xml` into a local array and never filled the workbook's own table, so the
+  first text a caller wrote took index `0` — which in the file already meant something else.
+  Every sheet copied through unspliced carries indices into that table, so the damage was not
+  limited to the cell being written. The table is now adopted in file order, and appended to.
+
+  Found by a splicer test asserting that a new string goes on the *end*; the same defect class
+  as the pivot tables the reader parsed correctly and `init(xlsxData:)` dropped, and the comment
+  there now has company.
+
+- **Adding a *styled* new cell to a workbook that was read is refused** rather than given a
+  colliding style index. The reader parses `xl/styles.xml` into its own type and does not fill
+  the workbook's `StyleSheet` either, so allocating an index would hand out `0` — the file's
+  first format, which every cell already carrying `s="0"` would be claimed to share. A new cell
+  with no style is unaffected: it gets no `s` attribute, which means the default format.
+  Loading the style table is what would lift this.
 
 - **Editing a chart sheet is refused rather than silently flattening it.** A chart tab is a
   `<sheet>` entry pointing at `xl/chartsheets/sheetN.xml`, and nothing here parses that part,

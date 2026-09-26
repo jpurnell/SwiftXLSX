@@ -73,6 +73,10 @@ public final class Workbook: @unchecked Sendable {
         // the archive, so parsing it a second time would be both wasted work and a second
         // chance to fail at something that has just succeeded.
         origin = parsed.origin
+        // And the string table, for the same reason as the comment above: a cell holds an index
+        // into it. Left behind, the first text a caller writes takes index 0 — which the file
+        // already uses for something else, so an unrelated cell silently changes its label.
+        sharedStrings.adopt(parsed.sharedStrings.all)
         // Reading filled the sheets through the same funnel a caller's `write` goes through.
         // Recording starts *after* that, so a workbook that has been opened and not edited
         // reports no changed cells — otherwise every cell of every file would arrive dirty.

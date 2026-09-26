@@ -65,7 +65,7 @@ extension Workbook {
         }
 
         let edited = sheets.filter(\.hasUnsavedChanges)
-        let replacements = try replacementParts(for: edited)
+        let replacements = try replacementParts(for: edited, origin: origin)
         // The chain records the order Excel last evaluated formulas in. An edit can invalidate
         // it, a wrong one makes Excel repair the file on open, and it is a regenerable cache —
         // so it goes, along with the content-type override that declares it. A declared part
@@ -88,18 +88,26 @@ extension Workbook {
     /// The part path of the calculation chain.
     private static let calculationChainPart = "xl/calcChain.xml"
 
-    /// New bytes for each edited sheet's part.
+    /// New bytes for each edited sheet's part, and for any table a splice appended to.
     ///
-    /// **Regenerated, for now.** Step 4 of the proposal replaces this with a splice of the
-    /// original XML, which is what keeps an edited sheet's conditional formatting, hyperlinks
-    /// and `<drawing>` anchor. Until then an edit costs the unmodelled elements of *that sheet*
-    /// and nothing else — where before it cost every unmodelled part of the whole workbook.
+    /// Each edited sheet's original XML is **edited, not regenerated** — see
+    /// ``WorksheetSplicer``. That is what keeps its conditional formatting, its hyperlinks, its
+    /// page setup and its `<drawing>` anchor, and it is why the index tables usually do not have
+    /// to be written at all: a splice reuses the style and string indices already in the file,
+    /// and only touches a table when a genuinely new string or style has to go on the end of it.
     ///
-    /// - Parameter edited: The sheets with unsaved changes.
+    /// - Parameters:
+    ///   - edited: The sheets with unsaved changes.
+    ///   - origin: The source archive, for the original XML of each sheet.
     /// - Returns: Part path to bytes.
-    /// - Throws: ``SaveError/spliceFailed(part:reason:)`` if a sheet's part cannot be named.
-    private func replacementParts(for edited: [Worksheet]) throws -> [String: Data] {
+    /// - Throws: ``SaveError/spliceFailed(part:reason:)`` if a sheet's part cannot be named,
+    ///   is not a worksheet, or holds an edit that would break a cell the caller never touched.
+    private func replacementParts(for edited: [Worksheet],
+                                  origin: [ZIPEntry]) throws -> [String: Data] {
         var replacements: [String: Data] = [:]
+        var appendedSharedString = false
+        var registeredStyle = false
+
         for sheet in edited {
             guard let part = sheet.originPart else {
                 throw SaveError.spliceFailed(part: sheet.name,
@@ -116,16 +124,39 @@ extension Workbook {
                     reason: "'\(sheet.name)' is not a worksheet — this library can read its "
                         + "cells but cannot write the part back")
             }
-            replacements[part] = Data(worksheetXML(sheet: sheet).utf8)
+            guard let entry = origin.first(where: { $0.path == part }) else {
+                throw SaveError.spliceFailed(part: part,
+                                             reason: "the part is not in the archive")
+            }
+
+            let splicer = WorksheetSplicer(part: part,
+                                           original: String(decoding: entry.data, as: UTF8.self))
+            let result = try splicer.spliced(edits(of: sheet),
+                                             sharedStrings: sharedStrings,
+                                             styleSheet: styleSheet)
+            replacements[part] = Data(result.xml.utf8)
+            appendedSharedString = appendedSharedString || result.appendedSharedString
+            registeredStyle = registeredStyle || result.registeredStyle
         }
-        guard !replacements.isEmpty else { return replacements }
-        // A regenerated sheet writes fresh shared-string and style indices, so both tables
-        // have to go out with it. They are rebuilt rather than appended to, which is why this
-        // is bounded to the sheets that changed — and why step 4's splice, which touches
-        // neither table, is the better answer.
-        replacements["xl/sharedStrings.xml"] = Data(sharedStrings.toXML().utf8)
-        replacements["xl/styles.xml"] = Data(styleSheet.toXML().utf8)
+
+        // Both tables are append-only on this path: the reader loaded them from the file, so
+        // every index a copied-through sheet still holds keeps its meaning.
+        if appendedSharedString {
+            replacements["xl/sharedStrings.xml"] = Data(sharedStrings.toXML().utf8)
+        }
+        if registeredStyle {
+            replacements["xl/styles.xml"] = Data(styleSheet.toXML().utf8)
+        }
         return replacements
+    }
+
+    /// The edits a worksheet has recorded, as the splicer wants them.
+    private func edits(of sheet: Worksheet) -> [WorksheetSplicer.Edit] {
+        sheet.changedCells.compactMap { reference in
+            guard let entry = sheet.entry(at: reference.reference) else { return nil }
+            return WorksheetSplicer.Edit(reference: reference,
+                                         value: entry.0, style: entry.1)
+        }
     }
 
     /// The content types with the calculation chain's override removed.

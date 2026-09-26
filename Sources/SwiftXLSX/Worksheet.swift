@@ -86,6 +86,12 @@ public final class Worksheet: @unchecked Sendable {
         changedReferences.append(ref)
     }
 
+    /// The value and style stored at one cell, for a writer that needs both.
+    ///
+    /// - Parameter ref: The cell reference, in A1 notation.
+    /// - Returns: The value and its style, or `nil` if the cell is not populated.
+    func entry(at ref: String) -> (CellValue, CellStyle)? { cells[ref] }
+
     // MARK: - Change Tracking
 
     /// Whether ``store(_:_:)`` is recording the cells it writes.

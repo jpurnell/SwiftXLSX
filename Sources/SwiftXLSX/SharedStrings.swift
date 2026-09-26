@@ -8,6 +8,29 @@ public final class SharedStrings: @unchecked Sendable {
     /// The number of unique strings in the table.
     public var count: Int { strings.count }
 
+    /// Every string, in index order.
+    var all: [String] { strings }
+
+    /// Adopts the table read from a file, in file order.
+    ///
+    /// **Indices are positional, and cells hold the index rather than the string.** A cell
+    /// reading `<c t="s"><v>7</v></c>` means "the eighth entry of this table", so a table that
+    /// starts empty makes the first string a caller writes index `0` — which in the file
+    /// already meant something else. Writing one text cell into a real workbook that way
+    /// relabels an unrelated cell, silently, and every sheet copied through unspliced carries
+    /// indices into this table.
+    ///
+    /// Called once by the reader, before anything can ask for an index.
+    ///
+    /// - Parameter table: The strings, in the order the file stored them.
+    func adopt(_ table: [String]) {
+        guard strings.isEmpty else { return }
+        for string in table {
+            if lookup[string] == nil { lookup[string] = strings.count }
+            strings.append(string)
+        }
+    }
+
     /// Returns the index for a string, adding it if not already present.
     public func index(for string: String) -> Int {
         if let existing = lookup[string] {

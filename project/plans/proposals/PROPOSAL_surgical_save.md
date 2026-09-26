@@ -437,9 +437,11 @@ would put a non-Swift dependency in a package whose value is being pure Swift.
    archive. The reader was the wrong source and would have lost data: it reads
    `xl/pivotTables/…`, `xl/pivotCache/…` and each sheet's `_rels`, none of which the writer
    emits, so "what the reader consumed" would have marked those as rewritten and dropped them.
-2. **Where does the splicer live?** A new `Writer/WorksheetSplicer.swift`, or an extension of the
-   existing reader into a rewriter that retains source offsets? The second is faster and more
-   faithful; the first is easier to test in isolation. §9.
+2. ~~**Where does the splicer live?** A new `Writer/WorksheetSplicer.swift`, or an extension of
+   the existing reader into a rewriter that retains source offsets?~~ **Answered 2026-09-26: a
+   separate `Writer/WorksheetSplicer.swift`.** The whole claim of this feature is "it changed
+   nothing else", and the test that says so is a string comparison against the original with one
+   substitution applied. Being able to write that test beat being faster.
 3. ~~**Does `Worksheet` track changes today?** §4 needs `changedCells` and there is no dirty flag
    now.~~ **Answered 2026-09-26: it did not, and it does now.** The catch was that the parser
    and a caller's `write` share one funnel (`store(_:_:)`), so recording had to start *after*
@@ -660,7 +662,22 @@ stays `.markForRecalculation`.
 | 5 | the three archive traps | **add `StaleValuePolicy` (§18.4)** |
 | 6 | corpus fidelity green | re-run this harness; it is the pass/fail |
 
-**Next action:** step 4 — the splicer. Steps 1, 2 and 3 are done; 2a is withdrawn (§18.3).
+**Next action:** step 5's remainder — `StaleValuePolicy` (§18.4) — then step 6.
+
+Steps 1–4 are done, 2a is withdrawn, and step 5 is two-thirds done. What is left is the one
+thing §18.4 amended rather than inherited: `fullCalcOnLoad` is honest and wrong for a workbook
+whose formulas Excel cannot resolve alone, and the alternative — recompute and write the values
+in — needs an evaluator this package does not have. It is a closure the caller supplies.
+
+Also outstanding and not yet scheduled:
+
+- **§3.4, `overwriting:`** — `save(to:)` still overwrites without asking. A behavioural break
+  worth doing deliberately, with its own tests.
+- **The style table.** The reader parses `xl/styles.xml` into `ParsedStyleSheet` and never fills
+  the workbook's `StyleSheet`, which is why a styled new cell is refused. Loading it would lift
+  that, and is the same defect shape as the shared strings fixed in step 4.
+- **Old step 4 note, now obsolete:** autoFilter criteria needed nothing — an unchanged sheet is
+  copied byte for byte, and a spliced one keeps everything it did not touch. Steps 1, 2 and 3 are done; 2a is withdrawn (§18.3).
 
 Both of §18.3b's losses turned out to be fixed by step 3 rather than needing work of their own:
 preserving the original parts keeps chartsheets as chartsheets, and an unchanged sheet copied
