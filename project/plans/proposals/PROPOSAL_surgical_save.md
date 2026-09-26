@@ -695,3 +695,76 @@ Three things step 3 learned that step 4 should carry:
 3. **The index tables.** Regenerating a sheet forces `sharedStrings.xml` and `styles.xml` out
    with it. A splice touches neither, which is §3.3's append-only rule getting easier rather
    than harder — and is most of why step 4 is worth doing.
+
+
+---
+
+## 19. Step 6: the corpus, with an edit applied
+
+**Measured 2026-09-26.** Every figure quoted for steps 3 and 4 until now was either the
+*unedited* case over fifty workbooks or the edited case over *one*. This is the run that covers
+the gap: open each workbook, write one cell, save, and check what it cost.
+
+Two passes, because replacing a cell and inserting one exercise different halves of the splicer
+and mixing them would make a failure impossible to attribute.
+
+### 19.1 Replacing the sheet's first populated cell
+
+| | |
+|---|---:|
+| workbooks | 50 |
+| refused or threw | **0** |
+| re-readable after saving | **50 / 50** |
+| the edit reads back correctly | **50 / 50** |
+| every *other* sheet byte-identical | **50 / 50** |
+| unmodelled in-sheet elements preserved | **50 / 50** |
+| cell count unchanged | **50 / 50** |
+| formula count unchanged | **50 / 50** |
+
+Sheet XML byte delta: median **0**, maximum **17**. Parts touched per edit: one for the
+fourteen workbooks with no calculation chain, three for the thirty-six with one — the sheet, the
+chain, and the content types that declared it.
+
+**The median of zero is a coincidence of the test value, not a no-op**, and it is worth writing
+down because it looked like one. The first populated cell of most sheets is a text header:
+`<c r="A1" s="3" t="s"><v>0</v></c>` becomes `<c r="A1" s="3"><v>123.456</v></c>`, which drops
+`t="s"` (six bytes) and grows the value from `0` to `123.456` (six bytes). Confirmed by hand on
+one workbook — one part changed, and the sheet is identical apart from `A1`.
+
+### 19.2 Inserting a cell past the end of the sheet
+
+Two columns and three rows beyond `lastPopulatedCell`, so a `<row>` has to be created and the
+`<dimension>` widened.
+
+| | |
+|---|---:|
+| refused or threw | **0** |
+| re-readable, and the edit reads back | **50 / 50** |
+| every other sheet byte-identical | **50 / 50** |
+| unmodelled elements preserved | **50 / 50** |
+| formula count unchanged | **50 / 50** |
+| cell count exactly +1 | **50 / 50** |
+| `<dimension>` widened | **46 / 46** that had one |
+
+The four without a `<dimension>` are left without one: absent is legal, and inventing one is a
+change nobody asked for.
+
+### 19.3 What is still not verified: Excel
+
+**No file produced by any of this has been opened in Excel.** Everything above is this
+package reading its own output, and a workbook that satisfies this package can still make Excel
+offer to repair it. That is the half of step 6 that cannot be automated here.
+
+`~/Desktop/DNREARN-edited-one-cell.xlsx` is the candidate: the decomposed Goldman model with
+one cell changed — `Production!BU8`, the 1Q04 oil rate, `18.1` → `123.456`. It carries two
+charts, three external links, two comment parts and VML drawings, and of its 33 parts **32 are
+byte-identical** to the file it came from; the only change is `xl/worksheets/sheet4.xml`, which
+is identical apart from that one `<c>`. Opening it should show: no repair dialog, both charts,
+the comments, and the production and earnings rows recalculating off the new rate.
+
+### 19.4 The harness is in a scratchpad
+
+§17 calls this run "the pass/fail", and it currently lives in a throwaway package outside the
+repository. A gate that cannot be re-run is not a gate. It belongs beside `workbook-oracle` and
+`name-round-trip` as an executable over the private corpus — the same shape, the same resume
+rule, the same reason.

@@ -120,7 +120,15 @@ public final class Worksheet: @unchecked Sendable {
     /// order — is not a file's numbering. A workbook whose first tab is a chart sheet has its
     /// first *worksheet* in `sheet1.xml` and its chart tab in `chartsheets/sheet1.xml`, so
     /// writing an edit back by position would put it in the wrong part.
-    private(set) var originPart: String?
+    ///
+    /// Public because the path is the only thing that tells a caller **what kind of sheet this
+    /// is**. The reader has no parser for a chart sheet, so one arrives looking like an ordinary
+    /// empty worksheet — and in a real corpus workbook it arrives *first*, which is what
+    /// `sheets.first` reaches for. A caller that means to edit a worksheet can check for
+    /// `xl/worksheets/` rather than discovering the difference from a thrown
+    /// ``SaveError/spliceFailed(part:reason:)``. It is also what ``SaveManifest`` reports
+    /// against, so a caller can match a manifest entry back to the sheet it came from.
+    public private(set) var originPart: String?
 
     /// Records which part this worksheet was read from.
     ///

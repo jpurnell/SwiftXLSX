@@ -9,6 +9,13 @@
 
 ### Changed
 
+- **`Worksheet.originPart` is public.** The part path is the only thing that tells a caller what
+  kind of sheet it has: the reader has no parser for a chart sheet, so one arrives looking like
+  an ordinary empty worksheet — and in a real corpus workbook it arrives *first*, which is what
+  `sheets.first` reaches for. A caller meaning to edit a worksheet can now check for
+  `xl/worksheets/` rather than learning the difference from a thrown `SaveError.spliceFailed`.
+  It is also what `SaveManifest` reports against.
+
 - **An edited sheet is now spliced, not regenerated.** Step 4 of
   `project/plans/proposals/PROPOSAL_surgical_save.md`, and the end of the arc: step 3 stopped an
   edit costing the workbook, and this stops it costing the sheet.
