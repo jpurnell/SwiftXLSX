@@ -7,6 +7,33 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`SaveStrategy`, `SaveManifest`, `SaveError`, `Workbook.defaultSaveStrategy`,
+  `Workbook.saveManifest(strategy:)`, `Worksheet.changedCells`,
+  `Worksheet.hasUnsavedChanges`** — what a save *would* do, before anything changes what it
+  does. Step 2 of `project/plans/proposals/PROPOSAL_surgical_save.md`.
+
+  A workbook read from a file now remembers the archive it came from, and a worksheet records
+  the cells written since. `saveManifest(strategy:)` reports which parts a save would rewrite,
+  preserve, splice or drop, and whether the edit makes cached values stale. `save()` itself is
+  unchanged: it still regenerates the archive from the in-memory model and still drops the
+  parts this library does not model. Changing that is step 3.
+
+  `defaultSaveStrategy` follows provenance rather than an argument — a workbook composed in
+  code is `.generated`, one read from a file is `.surgical` — so the destructive path cannot be
+  reached by forgetting a parameter.
+
+  The owned set is asked of the writer, not the reader. Open question 15.1 hoped the reader
+  could record the paths it consumed; it consumes strictly more than the writer emits
+  (pivot tables, pivot caches, per-sheet relationships), so deriving it that way would mark
+  those as rewritten and drop them.
+
+### Changed
+
+- Reading a workbook no longer unpacks the archive twice. The reader keeps the entries it
+  already has.
+
 ### Fixed
 
 - **An array formula's members are no longer written as an empty `<f/>`.** Excel stores a CSE

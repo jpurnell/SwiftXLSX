@@ -430,15 +430,22 @@ would put a non-Swift dependency in a package whose value is being pure Swift.
 
 ## 15. Open Questions
 
-1. **Is `ownedPartPaths` derivable rather than listed?** A hardcoded list rots. Better if the
+1. ~~**Is `ownedPartPaths` derivable rather than listed?** A hardcoded list rots. Better if the
    reader records which paths it consumed and the writer regenerates exactly those, so the two
-   cannot drift. Prefer that if it is not awkward.
+   cannot drift.~~ **Answered 2026-09-26: derivable, but from the *writer*, not the reader.**
+   `generatedParts()` is the one place that knows, and it is the same code that builds the
+   archive. The reader was the wrong source and would have lost data: it reads
+   `xl/pivotTables/…`, `xl/pivotCache/…` and each sheet's `_rels`, none of which the writer
+   emits, so "what the reader consumed" would have marked those as rewritten and dropped them.
 2. **Where does the splicer live?** A new `Writer/WorksheetSplicer.swift`, or an extension of the
    existing reader into a rewriter that retains source offsets? The second is faster and more
    faithful; the first is easier to test in isolation. §9.
-3. **Does `Worksheet` track changes today?** §4 needs `changedCells` and there is no dirty flag
-   now. Where it lives affects whether `write(_:to:)` gets slower for the composed-in-code case,
-   which must not regress.
+3. ~~**Does `Worksheet` track changes today?** §4 needs `changedCells` and there is no dirty flag
+   now.~~ **Answered 2026-09-26: it did not, and it does now.** The catch was that the parser
+   and a caller's `write` share one funnel (`store(_:_:)`), so recording had to start *after*
+   the read or every cell of every opened workbook would arrive dirty —
+   `beginRecordingChanges()`, called once by `init(xlsxData:)`. A workbook composed in code
+   never records, so that path costs one `Bool` test per write.
 4. **Does entry order in the ZIP matter to Excel?** §12. If it does, the origin's order must be
    preserved too, not just its contents.
 5. ~~**What does a corpus fidelity run actually fail on?** Unknown until run, and it is the most
@@ -646,14 +653,16 @@ stays `.markForRecalculation`.
 | # | was | now |
 |---|---|---|
 | 1 | corpus fidelity harness | ✅ done, §18 |
-| 2 | retain `origin`, manifest | unchanged |
+| 2 | retain `origin`, manifest | ✅ **done 2026-09-26.** `SaveStrategy`, `SaveManifest`, `SaveError`, `defaultSaveStrategy`, `saveManifest(strategy:)`, `Worksheet.changedCells`/`hasUnsavedChanges`. `save()` unchanged. Open question 15.1 answered: the owned set comes from the writer, because the reader consumes more than the writer emits |
 | ~~2a~~ | — | ~~diagnose the negative cell deltas~~ **withdrawn — the deltas were the harness's, §18.3. It produced one real fix (§18.3a, shipped) and two new losses to carry into steps 3 and 4 (§18.3b)** |
 | 3 | surgical save, parts byte-for-byte | unchanged — §18.1 says this alone recovers 57% of the archive |
 | 4 | the splicer | **add shared-formula handling (§18.4)** |
 | 5 | the three archive traps | **add `StaleValuePolicy` (§18.4)** |
 | 6 | corpus fidelity green | re-run this harness; it is the pass/fail |
 
-**Next action:** step 2 — retain `origin`, `SaveStrategy`, `SaveManifest`,
-`Worksheet.changedCells`. Step 2a is withdrawn (§18.3): the reader does not lose cells, and
-the one real defect under those numbers is fixed. Carry §18.3b into the build — chartsheets
-must be preserved as chartsheets by step 3, and autoFilter criteria by step 4.
+**Next action:** step 3 — surgical save proper: foreign parts byte for byte, unchanged sheets
+copied through. Steps 1 and 2 are done and step 2a is withdrawn (§18.3). Two things from §18.3b
+have to land inside step 3 rather than after it: **chartsheets must stay chartsheets** (today a
+chart tab is rewritten as an empty worksheet, which also shifts every part number after it),
+and the `<drawing r:id=…>` anchor in §2.1 means an unchanged sheet copied through byte for byte
+is the only way a chart survives. autoFilter criteria (§18.3b) belong to step 4.

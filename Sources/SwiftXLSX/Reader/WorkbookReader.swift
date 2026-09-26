@@ -93,6 +93,11 @@ enum WorkbookReader {
 
         // 7. For each sheet, resolve its file path and parse
         let workbook = Workbook()
+        // The archive itself, so a save can put back the parts nothing below parses. Recorded
+        // here because this is where the entries already exist: unpacking them again in
+        // ``Workbook/init(xlsxData:)`` would be wasted work and a second chance to fail at
+        // something that has just succeeded.
+        workbook.adopt(origin: entries)
 
         // Cache definitions are **shared**: 50 pivots in one corpus workbook are backed by 7
         // definitions, and one of them answers for 29 of the tables. Read each part once.

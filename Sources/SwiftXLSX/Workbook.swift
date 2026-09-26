@@ -27,6 +27,16 @@ public final class Workbook: @unchecked Sendable {
     /// into cells and cached there, so `GETPIVOTDATA` reads them back off the sheet; these
     /// layouts only say which table a formula means and where its columns are.
     public private(set) var pivotTables: [PivotTableLayout] = []
+
+    /// The archive this workbook was read from, part for part, or `nil` if it was composed
+    /// in code.
+    ///
+    /// Held so that a save can put back what this library does not model — charts, themes,
+    /// pivot caches, external links, and every part type Excel adds in future versions. A
+    /// workbook with an origin is somebody's file; one without is this library's own output,
+    /// and the two cannot safely be saved the same way.
+    private(set) var origin: [ZIPEntry]?
+
     let sharedStrings = SharedStrings()
     let styleSheet = StyleSheet()
 
@@ -59,6 +69,14 @@ public final class Workbook: @unchecked Sendable {
         // learns and this line does not mention is silently lost — which is exactly what
         // happened to the pivot tables: parsed correctly, adopted correctly, dropped here.
         pivotTables = parsed.pivotTables
+        // Taken from the reader rather than re-read from `data`: the reader already unpacked
+        // the archive, so parsing it a second time would be both wasted work and a second
+        // chance to fail at something that has just succeeded.
+        origin = parsed.origin
+        // Reading filled the sheets through the same funnel a caller's `write` goes through.
+        // Recording starts *after* that, so a workbook that has been opened and not edited
+        // reports no changed cells — otherwise every cell of every file would arrive dirty.
+        for sheet in sheets { sheet.beginRecordingChanges() }
     }
 
     /// Replaces the current sheets with the given array.
@@ -80,6 +98,13 @@ public final class Workbook: @unchecked Sendable {
     /// - Parameter layout: Where the table sits and what its data fields are called.
     func adopt(_ layout: PivotTableLayout) {
         pivotTables.append(layout)
+    }
+
+    /// Records the archive this workbook was read from.
+    ///
+    /// - Parameter entries: Every part of the source archive, in the order it held them.
+    func adopt(origin entries: [ZIPEntry]) {
+        origin = entries
     }
 
     /// Defines a name in this workbook.
@@ -129,6 +154,16 @@ public final class Workbook: @unchecked Sendable {
     /// - Returns: The complete `.xlsx` archive as `Data`.
     /// - Throws: An error if the ZIP archive cannot be created.
     public func save() throws -> Data {
+        try SwiftZIP.ZIPWriter.write(entries: generatedParts())
+    }
+
+    /// Every part this library writes from its own model, in the order it writes them.
+    ///
+    /// **The one place that knows the owned set.** `saveManifest(strategy:)` asks this rather
+    /// than carrying a list of part paths beside it, so a part added to the writer is in the
+    /// owned set without anything to keep in step — and a part this library has never modelled
+    /// cannot be mistaken for one it rewrites.
+    func generatedParts() -> [ZIPEntry] {
         var entries: [ZIPEntry] = []
 
         entries.append(ZIPEntry(path: "[Content_Types].xml", data: Data(contentTypesXML().utf8)))
@@ -146,7 +181,7 @@ public final class Workbook: @unchecked Sendable {
         entries.append(ZIPEntry(path: "xl/styles.xml", data: Data(styleSheet.toXML().utf8)))
         entries.append(ZIPEntry(path: "xl/sharedStrings.xml", data: Data(sharedStrings.toXML().utf8)))
 
-        return try SwiftZIP.ZIPWriter.write(entries: entries)
+        return entries
     }
 
     // MARK: - XML Generation

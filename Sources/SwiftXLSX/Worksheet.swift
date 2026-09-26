@@ -79,7 +79,44 @@ public final class Worksheet: @unchecked Sendable {
         lastPopulatedCell = CellRef(
             column: Swift.max(lastPopulatedCell?.column ?? 0, cell.column),
             row: Swift.max(lastPopulatedCell?.row ?? 0, cell.row))
+        guard isRecordingChanges, changedSet.insert(ref).inserted else { return }
+        // A cell written twice is one edit, not two: a splice replaces its `<c>` element, so
+        // only the final value matters. First-write order is kept, because that is the order
+        // a caller would expect to see their own changes listed in.
+        changedReferences.append(ref)
     }
+
+    // MARK: - Change Tracking
+
+    /// Whether ``store(_:_:)`` is recording the cells it writes.
+    ///
+    /// Off while a file is being read and on afterwards. The parser and a caller's `write`
+    /// share one funnel, so without this every cell of an opened workbook would count as an
+    /// edit and a surgical save would have nothing left to be surgical about.
+    private var isRecordingChanges = false
+
+    /// Cell references written since recording began, in first-write order.
+    private var changedReferences: [String] = []
+
+    /// The same references as a set, so a repeated write costs a hash rather than a scan.
+    private var changedSet: Set<String> = []
+
+    /// Starts recording writes as changes.
+    ///
+    /// Called by ``Workbook/init(xlsxData:)`` once the read has finished.
+    func beginRecordingChanges() {
+        isRecordingChanges = true
+    }
+
+    /// Cells written since this worksheet was read, in the order they were first written.
+    ///
+    /// Empty for a sheet that was read and not modified, which is what lets a surgical save
+    /// copy it through untouched rather than splicing it — and empty for a sheet composed in
+    /// code, which has no original XML to splice into.
+    public var changedCells: [CellRef] { changedReferences.map { CellRef($0) } }
+
+    /// Whether any cell has been written since this worksheet was read.
+    public var hasUnsavedChanges: Bool { !changedReferences.isEmpty }
 
     // MARK: - Internal Mutation (Reader Support)
 
