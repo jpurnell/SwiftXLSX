@@ -149,12 +149,17 @@ public final class Workbook: @unchecked Sendable {
         try data.write(to: url)
     }
 
-    /// Saves the workbook as in-memory `.xlsx` data.
+    /// Saves the workbook as in-memory `.xlsx` data, using ``defaultSaveStrategy``.
+    ///
+    /// Surgically if this workbook was read from a file, from the in-memory model if it was
+    /// composed in code. ``save(strategy:)`` explains the difference and why it follows
+    /// provenance rather than an argument.
     ///
     /// - Returns: The complete `.xlsx` archive as `Data`.
-    /// - Throws: An error if the ZIP archive cannot be created.
+    /// - Throws: ``SaveError/structuralChangeUnsupported(reason:)`` if sheets were added to or
+    ///   removed from a workbook that was read, or an error if the archive cannot be written.
     public func save() throws -> Data {
-        try SwiftZIP.ZIPWriter.write(entries: generatedParts())
+        try save(strategy: nil)
     }
 
     /// Every part this library writes from its own model, in the order it writes them.
@@ -245,7 +250,12 @@ public final class Workbook: @unchecked Sendable {
         return xml
     }
 
-    private func worksheetXML(sheet: Worksheet) -> String {
+    /// The XML for one worksheet, generated from the in-memory model.
+    ///
+    /// Not private because a surgical save regenerates the sheets an edit touched — see
+    /// `SurgicalSave.swift`. Step 4 of `PROPOSAL_surgical_save.md` replaces that use with a
+    /// splice of the original XML.
+    func worksheetXML(sheet: Worksheet) -> String {
         var xml = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">

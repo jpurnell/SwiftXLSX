@@ -156,20 +156,24 @@ struct SaveManifestTests {
         #expect(manifest.spliced.isEmpty)
     }
 
-    @Test("the parts the writer emits are the ones it would rewrite")
-    func manifestNamesTheOwnedParts() throws {
+    /// **An unedited surgical save rewrites nothing at all** — not even the parts this library
+    /// owns. `xl/workbook.xml` is the case worth naming: regenerating it would produce the
+    /// same `<sheets>` list and lose `<calcPr>`, `<bookViews>` and `<externalReferences>`.
+    @Test("an unedited surgical save rewrites nothing")
+    func manifestRewritesNothingWhenUnedited() throws {
         let manifest = try opened().saveManifest(strategy: .surgical)
-        for path in ["[Content_Types].xml", "_rels/.rels", "xl/workbook.xml",
-                     "xl/_rels/workbook.xml.rels", "xl/styles.xml", "xl/sharedStrings.xml"] {
-            #expect(manifest.rewritten.contains(path), "\(path) would not be rewritten")
-        }
-        #expect(!manifest.rewritten.contains("xl/theme/theme1.xml"),
-                "a theme is nothing this library writes")
+        #expect(manifest.rewritten.isEmpty,
+                "would rewrite \(manifest.rewritten) with nothing edited")
+        #expect(manifest.preserved.contains("xl/workbook.xml"),
+                "the original workbook part is still correct, so it is kept")
     }
 
-    /// An edited sheet is spliced rather than rewritten, and naming its cells is what lets a
-    /// caller see the blast radius before agreeing to it.
-    @Test("an edited sheet is spliced, and the calculation chain goes")
+    /// An edit is bounded to the sheet it touched, the two index tables that sheet writes
+    /// into, and the calculation chain. Everything else is still preserved.
+    ///
+    /// The sheet is **rewritten**, not spliced: the splicer is step 4. `spliced` stays empty
+    /// until then rather than describing a plan the code does not carry out.
+    @Test("an edit rewrites its own sheet and drops the calculation chain")
     func manifestAfterAnEdit() throws {
         let workbook = try opened()
         try #require(workbook.sheets.first).writeFormula("A1*4", to: "B2")
@@ -178,11 +182,12 @@ struct SaveManifestTests {
         #expect(manifest.forcesRecalculation)
         #expect(manifest.dropped.contains("xl/calcChain.xml"),
                 "a stale calculation chain makes Excel repair the file")
-        #expect(!manifest.rewritten.contains("xl/worksheets/sheet1.xml"),
-                "an edited sheet is spliced, not regenerated — that is the whole proposal")
-        let spliced = try #require(manifest.spliced.first)
-        #expect(spliced.part == "xl/worksheets/sheet1.xml")
-        #expect(spliced.cells.map(\.reference) == ["B2"])
+        #expect(manifest.rewritten.contains("xl/worksheets/sheet1.xml"))
+        #expect(manifest.spliced.isEmpty, "step 4 is what fills this in")
+        #expect(manifest.preserved.contains("xl/theme/theme1.xml"),
+                "an edit to one cell must not cost the theme")
+        #expect(!manifest.preserved.contains("xl/worksheets/sheet1.xml"),
+                "the edited sheet is not also preserved")
     }
 
     /// A manifest for the generated strategy tells the truth about what that strategy does:
@@ -195,16 +200,15 @@ struct SaveManifestTests {
         #expect(manifest.rewritten.contains("xl/workbook.xml"))
     }
 
-    // MARK: - Nothing saves differently yet
+    // MARK: - And what it actually does
 
-    /// Step 2 is deliberately inert. Asserted so that the step that changes it has to change
-    /// this test too, on purpose rather than by accident.
-    @Test("save() still rebuilds the archive and still drops foreign parts")
-    func saveIsUnchanged() throws {
-        let saved = try opened().save()
-        let paths = Set(try ZIPReader.read(from: saved).map(\.path))
-        #expect(!paths.contains("xl/theme/theme1.xml"),
-                "step 3 is what makes this survive; if it passes now, the step landed early")
+    /// This asserted the opposite until step 3 landed — that `save()` dropped the theme — so
+    /// that the step which changed the behaviour had to change the test on purpose. It did.
+    /// `SurgicalSaveTests` is where the preservation itself is covered.
+    @Test("save() preserves what it does not own")
+    func savePreservesForeignParts() throws {
+        let paths = Set(try ZIPReader.read(from: try opened().save()).map(\.path))
+        #expect(paths.contains("xl/theme/theme1.xml"))
         #expect(paths.contains("xl/worksheets/sheet1.xml"))
     }
 }

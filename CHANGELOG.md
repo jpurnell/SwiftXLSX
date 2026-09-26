@@ -7,7 +7,44 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`save()` no longer destroys the file it was read from.** A workbook read with
+  `Workbook(xlsxData:)` or `Workbook(contentsOf:)` is now written by putting its own archive
+  back and substituting only what an edit made wrong. One composed in code is written from the
+  in-memory model exactly as before; the strategy follows provenance, not an argument.
+
+  Measured over the same fifty-workbook corpus sample, before and after:
+
+  | | before | after |
+  |---|---|---|
+  | workbooks losing at least one part | 49 of 50 | **0 of 50** |
+  | parts lost | 816 of 1,440 (57%) | **0** |
+  | chartsheets surviving | 0 of 5 | **5 of 5** |
+  | `<externalReferences>` surviving | 0 of 2 | **2 of 2** |
+  | `<calcPr>` surviving | 0 of 50 | **50 of 50** |
+
+  Charts, themes, pivot caches, external links, comments, document properties, printer
+  settings and per-sheet relationships all survive, as do the in-sheet elements this library
+  has never modelled — conditional formatting, hyperlinks, page setup, and the `<drawing>`
+  anchor without which a chart part is orphaned. A real 33-part model round-trips byte for
+  byte, in the original entry order.
+
+  Parts this library *owns* are preserved too, not rebuilt. `xl/workbook.xml` is the case that
+  matters: regenerating it produced a correct `<sheets>` list and dropped `<calcPr>`,
+  `<bookViews>` and `<externalReferences>` — the table that says what `[2]` means in
+  `'[2]Oil&Gas'!AZ3`, without which the formula survives as a reference to nothing.
+
+  Editing a cell rewrites that sheet's part and the two index tables it writes into, and drops
+  `xl/calcChain.xml` along with its content-type override. Splicing the sheet instead — so an
+  edit costs nothing at all — is step 4.
+
+  `save(strategy: .generated)` keeps the old behaviour for callers who want a clean rebuild.
+  Step 3 of `project/plans/proposals/PROPOSAL_surgical_save.md`.
+
 ### Added
+
+- **`Workbook.save(strategy:)`** — see above.
 
 - **`SaveStrategy`, `SaveManifest`, `SaveError`, `Workbook.defaultSaveStrategy`,
   `Workbook.saveManifest(strategy:)`, `Worksheet.changedCells`,
@@ -35,6 +72,13 @@
   already has.
 
 ### Fixed
+
+- **Editing a chart sheet is refused rather than silently flattening it.** A chart tab is a
+  `<sheet>` entry pointing at `xl/chartsheets/sheetN.xml`, and nothing here parses that part,
+  so it arrives looking like an ordinary empty worksheet — first in the tab order, in the
+  corpus workbook this was found in, which is what `sheets.first` reaches for. Writing
+  worksheet XML over that part would put a blank grid where a chart was, so
+  `SaveError.spliceFailed` is thrown instead.
 
 - **An array formula's members are no longer written as an empty `<f/>`.** Excel stores a CSE
   array formula once, at its anchor, whose `t="array" ref=` names the rectangle it fills; the

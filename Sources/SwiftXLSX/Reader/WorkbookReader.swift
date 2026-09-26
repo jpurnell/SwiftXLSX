@@ -123,6 +123,11 @@ enum WorkbookReader {
             guard let sheetData = entryMap[sheetPath] else {
                 continue  // Skip sheets with missing data rather than failing
             }
+            // Which part this sheet came out of. A surgical save needs it to put an edit back
+            // where it was found: the writer's own numbering is `sheet1.xml`, `sheet2.xml`, …
+            // in workbook order, and a file whose first tab is a chartsheet does not number
+            // its worksheets that way.
+            sheet.adopt(originPart: sheetPath)
 
             try WorksheetParser.parse(data: sheetData, into: sheet,
                                        sharedStrings: sharedStrings, styles: styles,

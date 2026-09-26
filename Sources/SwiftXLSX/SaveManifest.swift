@@ -50,7 +50,12 @@ public struct SaveManifest: Sendable, Equatable {
         }
     }
 
-    /// Sheets whose XML will be spliced, with the cells changed in each.
+    /// Sheets whose XML will be edited in place rather than regenerated, with the cells
+    /// changed in each.
+    ///
+    /// **Empty today.** The splicer is step 4 of `PROPOSAL_surgical_save.md`; until it exists
+    /// an edited sheet is regenerated and appears in ``rewritten``. Use ``Worksheet``'s
+    /// `changedCells` to see which cells a caller has touched in the meantime.
     public let spliced: [Splice]
 
     /// Parts regenerated wholesale from the in-memory model.
@@ -144,24 +149,35 @@ extension Workbook {
         }
         guard let origin else { throw SaveError.noOriginArchive }
 
-        let owned = Set(generatedParts().map(\.path))
         let dropped = forcesRecalculation ? ["xl/calcChain.xml"] : []
         let droppedSet = Set(dropped)
 
-        // An edited sheet is spliced rather than regenerated, so its part is neither rewritten
-        // nor merely preserved — it is the third thing, and the reason this manifest exists.
-        var spliced: [SaveManifest.Splice] = []
-        for (index, sheet) in sheets.enumerated() where sheet.hasUnsavedChanges {
-            spliced.append(SaveManifest.Splice(part: "xl/worksheets/sheet\(index + 1).xml",
-                                               cells: sheet.changedCells))
+        // A surgical save puts the original archive back, so everything in it is preserved
+        // except what an edit has made wrong. That is narrower than "the parts this library
+        // owns": `xl/workbook.xml` is owned and is preserved anyway, because regenerating it
+        // would drop `<calcPr>`, `<bookViews>` and `<externalReferences>` while producing a
+        // `<sheets>` list no different from the one already there.
+        //
+        // `spliced` is empty until the splicer exists (step 4 of the proposal). An edited
+        // sheet is regenerated today, so it is reported as rewritten — saying "spliced" of a
+        // part this code rebuilds would be describing a plan rather than an outcome, and the
+        // whole point of a manifest is to be shown to someone before they agree to it.
+        var rewritten: [String] = []
+        for sheet in sheets where sheet.hasUnsavedChanges {
+            guard let part = sheet.originPart else { continue }
+            rewritten.append(part)
         }
-        let splicedSet = Set(spliced.map(\.part))
+        if !rewritten.isEmpty {
+            // A regenerated sheet writes fresh indices into both tables, so both go with it.
+            rewritten.append(contentsOf: ["xl/sharedStrings.xml", "xl/styles.xml"])
+        }
+        let rewrittenSet = Set(rewritten)
 
         return SaveManifest(
-            spliced: spliced,
-            rewritten: generatedParts().map(\.path).filter { !splicedSet.contains($0) },
+            spliced: [],
+            rewritten: rewritten,
             preserved: origin.map(\.path).filter {
-                !owned.contains($0) && !droppedSet.contains($0)
+                !rewrittenSet.contains($0) && !droppedSet.contains($0)
             },
             dropped: dropped,
             forcesRecalculation: forcesRecalculation)

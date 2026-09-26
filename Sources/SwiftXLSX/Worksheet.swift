@@ -108,6 +108,21 @@ public final class Worksheet: @unchecked Sendable {
         isRecordingChanges = true
     }
 
+    /// The archive part this worksheet was read from, or `nil` if it was composed in code.
+    ///
+    /// Kept because the writer's own numbering — `sheet1.xml`, `sheet2.xml`, … in workbook
+    /// order — is not a file's numbering. A workbook whose first tab is a chart sheet has its
+    /// first *worksheet* in `sheet1.xml` and its chart tab in `chartsheets/sheet1.xml`, so
+    /// writing an edit back by position would put it in the wrong part.
+    private(set) var originPart: String?
+
+    /// Records which part this worksheet was read from.
+    ///
+    /// - Parameter path: The part path, as it appears in the archive.
+    func adopt(originPart path: String) {
+        originPart = path
+    }
+
     /// Cells written since this worksheet was read, in the order they were first written.
     ///
     /// Empty for a sheet that was read and not modified, which is what lets a surgical save

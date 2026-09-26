@@ -660,9 +660,21 @@ stays `.markForRecalculation`.
 | 5 | the three archive traps | **add `StaleValuePolicy` (§18.4)** |
 | 6 | corpus fidelity green | re-run this harness; it is the pass/fail |
 
-**Next action:** step 3 — surgical save proper: foreign parts byte for byte, unchanged sheets
-copied through. Steps 1 and 2 are done and step 2a is withdrawn (§18.3). Two things from §18.3b
-have to land inside step 3 rather than after it: **chartsheets must stay chartsheets** (today a
-chart tab is rewritten as an empty worksheet, which also shifts every part number after it),
-and the `<drawing r:id=…>` anchor in §2.1 means an unchanged sheet copied through byte for byte
-is the only way a chart survives. autoFilter criteria (§18.3b) belong to step 4.
+**Next action:** step 4 — the splicer. Steps 1, 2 and 3 are done; 2a is withdrawn (§18.3).
+
+Both of §18.3b's losses turned out to be fixed by step 3 rather than needing work of their own:
+preserving the original parts keeps chartsheets as chartsheets, and an unchanged sheet copied
+through byte for byte keeps its autoFilter criteria along with everything else in it. What step
+3 left is narrower than the proposal expected: **an edit still costs the unmodelled elements of
+the one sheet it touched**, because that sheet is regenerated. That is exactly what §3.2 is for.
+
+Three things step 3 learned that step 4 should carry:
+
+1. **Shared formulas** (§18.4). `<f t="shared" si="47"/>` is self-closing, and splicing a
+   *master* breaks every follower pointing at its `si`. `SaveError` needs a case for it.
+2. **A tab is not always a worksheet.** A chart sheet arrives looking like an empty worksheet
+   and is first in the tab order in the corpus workbook this was found in. Step 3 refuses to
+   write worksheet XML over `xl/chartsheets/…`; the splicer inherits that guard.
+3. **The index tables.** Regenerating a sheet forces `sharedStrings.xml` and `styles.xml` out
+   with it. A splice touches neither, which is §3.3's append-only rule getting easier rather
+   than harder — and is most of why step 4 is worth doing.
