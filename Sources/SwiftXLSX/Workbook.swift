@@ -275,14 +275,24 @@ public final class Workbook: @unchecked Sendable {
                         + "<f>\(escapeXML(text))</f>"
                         + "<v>\(escapeXML(ExcelError.calc.rawValue))</v></c>"
                 case .formula(let ast, let cached):
-                    // A member of an array formula's span. Excel stores the formula
-                    // once, at the anchor, and leaves every other cell an empty
-                    // `<f/>`. `_ARRAY` is our internal mark for that and is not a
-                    // function Excel knows, so serializing it would fill the span
-                    // with `#NAME?`.
+                    // A member of an array formula's span. Excel stores the formula once, at
+                    // the anchor, whose `ref` names the rectangle; the other cells of the
+                    // span carry **no `<f>` element at all**. `_ARRAY` is this package's
+                    // internal mark for a member and is not a function Excel knows, so
+                    // serializing it would fill the span with `#NAME?`.
+                    //
+                    // This wrote an empty `<f/>` until 2026-09-26, on the stated grounds that
+                    // Excel does. Excel does not: measured across the corpus, all **32,826**
+                    // array-member cells carry no `<f>` and not one carries an empty one. A
+                    // member is recovered on read from the anchor's `ref`, so writing nothing
+                    // loses nothing — see `ArrayFormulaWriteBackTests`.
                     if case .function("_ARRAY", _) = ast {
                         let member = cachedValueXML(cached)
-                        xml += "<c r=\"\(ref)\"\(member.type) s=\"\(styleId)\"><f/>"
+                        guard !member.value.isEmpty else {
+                            xml += "<c r=\"\(ref)\" s=\"\(styleId)\"/>"
+                            continue
+                        }
+                        xml += "<c r=\"\(ref)\"\(member.type) s=\"\(styleId)\">"
                         xml += member.value
                         xml += "</c>"
                         continue

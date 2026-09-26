@@ -1,6 +1,6 @@
 # Design Proposal: Surgical Save — editing a workbook without destroying it
 
-**Status:** proposal, 2026-09-08. Ready for RED.
+**Status:** proposal, 2026-09-08. **Step 1 measured 2026-09-24 — see §18.** Ready for RED.
 **Phase:** 0 (Design).
 **Motivated by:** `SwiftExcelFunctions/project/plans/proposals/PROPOSAL_model_graph_simulation.md`
 §12, which needs to write a corrected value back into a real workbook. The defect is SwiftXLSX's
@@ -441,8 +441,9 @@ would put a non-Swift dependency in a package whose value is being pure Swift.
    which must not regress.
 4. **Does entry order in the ZIP matter to Excel?** §12. If it does, the origin's order must be
    preserved too, not just its contents.
-5. **What does a corpus fidelity run actually fail on?** Unknown until run, and it is the most
-   informative number in this proposal. Run it before step 3.
+5. ~~**What does a corpus fidelity run actually fail on?** Unknown until run, and it is the most
+   informative number in this proposal. Run it before step 3.~~ **Answered 2026-09-24, §18.**
+   57% of all parts, 98% of workbooks — and, unexpectedly, the sheet model is lossy too.
 
 ---
 
@@ -479,3 +480,180 @@ around a guess.
 
 **Next action:** step 1. Round-trip a corpus sample through today's `save()` and count what
 changes. That number is the argument for everything above it.
+
+---
+
+## 18. Step 1: what the round trip actually loses
+
+**Measured 2026-09-24.** Fifty workbooks from the `~/Documents` corpus, each read with
+`Workbook(xlsxData:)` and written straight back with `save()`, the two archives compared. The
+corpus is private, so only shapes and counts are recorded here — no paths, no content.
+
+### 18.1 Parts
+
+| | |
+|---|---|
+| workbooks losing at least one part | **49 of 50 (98%)** |
+| parts in / parts out | 1,440 → 624 |
+| parts lost | **816 (57% of everything in the archives)** |
+
+By kind:
+
+```
+128  worksheet rels      95  charts          43  xl (misc)
+123  pivotCache          84  pivotTables     18  externalLinks
+112  drawings            48  tables          14  chartsheets
+ 97  docProps            46  theme           12  printerSettings, 3 media
+```
+
+The single workbook that lost nothing had nothing to lose: no charts, no pivots, no theme.
+
+### 18.2 Workbook-level elements
+
+Regenerating `xl/workbook.xml` drops what the writer does not model, whether or not the parts
+it points at survive:
+
+| element | present in | survived |
+|---|---:|---:|
+| `<calcPr>` | 50 | **0** |
+| `<externalReference>` | 2 | **0** |
+| `<definedName>` | 26 | 26 |
+
+`externalReferences` is the sharpest case and the one that motivated this measurement. A model
+whose price deck is linked as `'[2]Oil&Gas'!AZ3` keeps the formula *text* through a round trip
+and loses the table that says what `[2]` is. The formula survives as a reference to nothing.
+
+### 18.3 The finding that was not anticipated — **and 18.3 as first written was wrong**
+
+**Retracted 2026-09-26.** This section originally reported that the sheet model was lossy:
+cell counts moving by −12,975, −113 and +9,185 and formula counts by −97. Every one of those
+was an artefact of the harness, not a defect in the library. Step 2a was added to the plan on
+the strength of them, which is the cost of publishing a number without auditing the instrument
+that produced it.
+
+What was wrong, in the order it was found:
+
+| reported | actual cause |
+|---|---|
+| −12,975, −113, −3 cells | All bare `<c r="X"/>` — no style, type, value or formula. They carry nothing and dropping one is not a loss. 13,100 across the sample |
+| −97, −3 formulas | The counter matched `<f`, which also prefixes `<filter>`, `<filters>` and `<filterColumn>` — autoFilter criteria, not formulas |
+| +9,185 cells | The counter matched `<c r=`, assuming `r` comes first. OOXML fixes no attribute order and a Google Sheets export writes `<c t="s" s="12" r="A1">`. One input was undercounted by 6,904 cells and the writer was blamed for inventing them |
+
+Re-measured with the instrument fixed, over the same fifty workbooks:
+
+| | |
+|---|---|
+| workbooks losing a meaningful cell | **0 of 50** |
+| workbooks whose formula count changed | 3 of 50, all **gains** |
+
+So the sheet model round-trips its cells faithfully, as §2.1 assumed. **Step 2a is withdrawn.**
+
+### 18.3a What was under it: array-formula members were written as `<f/>`
+
+Chasing the smallest surviving delta — +13 formulas in a 322-cell workbook — found a real
+defect, and a narrow one. The sheet holds
+
+```
+<c r="E4" s="10"><f t="array" ref="E4:K5">TRANSPOSE(O3:P9)</f><v>0.818…</v></c>
+<c r="F4" s="13"><v>0.912…</v></c>
+```
+
+`E4:K5` is fourteen cells; Excel writes the formula once at the anchor and gives the other
+thirteen a cached value and nothing else. Thirteen was the delta exactly.
+
+The reader is right about these: it marks each member `_ARRAY(anchor, span)` — *computed by
+its anchor* — rather than copying the formula onto all fourteen. The writer had a branch for
+that sentinel which emitted an **empty `<f/>`**, with a comment asserting that is what Excel
+does.
+
+It is not. Measured over every array master in the corpus sample — **32,826 member cells** —
+all of them carry no `<f>` element and **not one** carries an empty `<f/>`.
+
+Fixed 2026-09-26: a member is written as its cached value alone, and self-closing when it has
+none. The anchor keeps `t="array" ref=`, which is what a reader rebuilds the span from, so a
+round trip still reports every member as array-entered. `ArrayFormulaWriteBackTests` covers
+the emptiness, the members, the anchor, the re-read, and the `_DATATABLE` sentinel beside it.
+On the workbook that produced the finding, the formula count now matches the source exactly —
+139 in, 139 out, zero empty `<f/>`.
+
+### 18.3b Two losses the corrected instrument did find
+
+| | present in | survived |
+|---|---:|---:|
+| **chartsheets** | 7 parts, 5 workbooks | **0** |
+| **autoFilter criteria** (`<filter>`) | 1 workbook | **0** |
+
+The chartsheet case is the more serious and is not in §2.1's table. A chart sheet is a
+`<sheet>` entry in `workbook.xml` pointing at `xl/chartsheets/sheetN.xml`. The reader takes
+the entry and cannot parse the part, so the sheet arrives empty; the writer then emits it as
+`xl/worksheets/sheetN.xml`. **A chart tab comes back as a blank grid**, and every part number
+after it shifts by one. Seen in the corpus as `Monthy Subs Chart`, the first tab of a
+54-sheet workbook.
+
+autoFilter criteria are smaller but the same shape: §2.1 records `autoFilter` as read and
+written, and only its *range* is — the `<filterColumn>`/`<filters>`/`<filter>` children that
+say what is actually filtered are dropped.
+
+### 18.4 Two amendments to the design
+
+**§3.2 must handle shared formulas, and they are not rare.** A shared formula is written
+`<f t="shared" si="47"/>` — self-closing, its text held by a master cell elsewhere in the sheet.
+Two consequences the splicer cannot ignore:
+
+- Any regex or parser that matches only `<f>…</f>` silently skips every follower. Applying cached
+  values to `DNREARN.xls` hit exactly this: the write-back stalled on the first shared-formula
+  cell in the dependency cone and iterated twenty rounds without converging, because the values
+  were computed, reported, and never written. One sheet in that model has 4,063 of them.
+- Splicing a cell that is the **master** of a shared range breaks every follower that refers to
+  its `si`. The splicer must either expand the range first or refuse, and `SaveError` needs a case
+  for it.
+
+**§3.3's `fullCalcOnLoad` rule is right for honesty and wrong for legibility, and the workbook
+should choose.** Setting it makes Excel discard the cache and recalculate, which is correct when
+every function in the file is one Excel knows. It is destructive when the file contains add-in
+calls: a Risk Solver model opened without the add-in recalculates `_xll.PsiNormal(…)` to `#NAME?`
+and cascades that through everything downstream. The stale cache was more useful than the honest
+recalculation.
+
+The better answer is now available: **recalculate with `SwiftExcelFunctions` and write the values
+in**, leaving `<calcPr>` alone. That was done by hand for `DNREARN` — iterate the oracle, write
+back every cell where we produce a clean number the cache disagrees with, repeat to a fixed point
+(19 rounds) — and it ended with the workbook's finding set identical to the untouched original.
+That argues for a third option alongside `.generated` and `.surgical`, or a parameter on
+`.surgical`:
+
+```swift
+/// What to do about cached values that an edit invalidated.
+public enum StaleValuePolicy: Sendable, Equatable {
+    /// Set `fullCalcOnLoad`, and let Excel sort it out. Honest; unreadable if the
+    /// workbook calls functions Excel cannot resolve on its own.
+    case markForRecalculation
+    /// Recompute and write the values in. Needs an evaluator, so it cannot live here.
+    case recomputed
+    /// Leave the cache alone. For a caller who knows the edit changed nothing downstream.
+    case untouched
+}
+```
+
+`.recomputed` cannot be implemented in SwiftXLSX — the evaluator is upstream in
+SwiftExcelFunctions — so the shape is probably a closure the caller supplies, and the default
+stays `.markForRecalculation`.
+
+### 18.5 What this does to the sequencing
+
+§17 step 1 is done. Its output is a work list, and it reorders what follows:
+
+| # | was | now |
+|---|---|---|
+| 1 | corpus fidelity harness | ✅ done, §18 |
+| 2 | retain `origin`, manifest | unchanged |
+| ~~2a~~ | — | ~~diagnose the negative cell deltas~~ **withdrawn — the deltas were the harness's, §18.3. It produced one real fix (§18.3a, shipped) and two new losses to carry into steps 3 and 4 (§18.3b)** |
+| 3 | surgical save, parts byte-for-byte | unchanged — §18.1 says this alone recovers 57% of the archive |
+| 4 | the splicer | **add shared-formula handling (§18.4)** |
+| 5 | the three archive traps | **add `StaleValuePolicy` (§18.4)** |
+| 6 | corpus fidelity green | re-run this harness; it is the pass/fail |
+
+**Next action:** step 2 — retain `origin`, `SaveStrategy`, `SaveManifest`,
+`Worksheet.changedCells`. Step 2a is withdrawn (§18.3): the reader does not lose cells, and
+the one real defect under those numbers is fixed. Carry §18.3b into the build — chartsheets
+must be preserved as chartsheets by step 3, and autoFilter criteria by step 4.

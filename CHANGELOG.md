@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **An array formula's members are no longer written as an empty `<f/>`.** Excel stores a CSE
+  array formula once, at its anchor, whose `t="array" ref=` names the rectangle it fills; the
+  other cells of the span carry a cached value and no `<f>` element. The writer emitted `<f/>`
+  for them — an `<f>` with no formula in it — on the stated grounds that this is what Excel
+  does.
+
+  It is not. Measured across the corpus, **32,826** array-member cells carry no `<f>` and not
+  one carries an empty `<f/>`. A member is now written as its cached value alone, self-closing
+  when it has none. The anchor is unchanged, and a reader rebuilds the span from its `ref`, so
+  a saved workbook still reports every member as array-entered.
+
+  Found by a read-write round trip over a fifty-workbook corpus sample, which gained 13 formula
+  cells in one workbook: the anchor's span was fourteen cells. That workbook's formula count now
+  matches its source exactly. See `project/plans/proposals/PROPOSAL_surgical_save.md` §18.3a.
+
 ## [0.36.0] - 2026-09-21
 
 ### Added
