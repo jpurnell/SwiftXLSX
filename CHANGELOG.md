@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-09-26
+
+**Opening somebody's workbook and saving it no longer destroys it.** Measured over a
+fifty-workbook corpus sample, the previous release dropped **816 of 1,440 parts** — 57%,
+including every chart, theme, pivot cache and external link — and 49 of 50 workbooks lost at
+least one. This release loses none, and an edit to one cell costs 22 bytes rather than a sheet.
+
+The whole of `project/plans/proposals/PROPOSAL_surgical_save.md`, steps 1 through 6.
+
+### ⚠️ Breaking
+
+- **`save(to:)` on a workbook read from a file refuses to overwrite an existing path** unless
+  `overwriting: true` is passed. See below. Every `save(to:)` call site in the sibling
+  repositories composes its workbook in code and is unaffected.
+- **`save()` on a workbook read from a file now preserves that file's archive** rather than
+  regenerating one. `save(strategy: .generated)` restores the old behaviour deliberately.
+
 ### Added
 
 - **A new cell can be given a style, in a workbook this library did not write.** It used to be

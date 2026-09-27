@@ -20,7 +20,39 @@ serializes, reads and writes. To compute results, add
 - **Layout** — merge cells, freeze panes, auto-filter, data validation, custom row heights
 - **Cell References** — A1-style with absolute/relative markers, cross-sheet references
 - **XLSX Reader** — parse existing .xlsx files back into Workbook objects, including packages written by Excel (fixed in 0.6.0; earlier releases returned an empty workbook for those)
+- **Surgical Save** — open somebody's workbook, change a cell, and save it with everything else
+  exactly as it was: charts, themes, pivot caches, external links, conditional formatting, and
+  every part type Excel adds in future versions (0.37.0; see below)
 - **Pure-Swift ZIP** — no Process/shell dependencies, works on iOS and Linux
+
+## Saving a workbook you did not create
+
+A workbook **read from a file** saves by putting that file's own archive back, changing only
+the cells you changed. One composed in code saves from the in-memory model, exactly as it
+always has. The strategy follows provenance rather than an argument, so the destructive path
+cannot be reached by forgetting a parameter.
+
+```swift
+let workbook = try Workbook(contentsOf: url)
+workbook.sheets.first?.write(42, to: "C7")
+
+// Refuses to overwrite the file it came from unless you say so.
+try workbook.save(to: url, overwriting: true)
+```
+
+Before you agree to anything, `saveManifest()` says what a save would do — which parts it would
+rewrite, preserve or drop, and whether the edit makes cached values stale.
+
+Measured over a fifty-workbook corpus sample, opening and saving with no edits changes **no
+part at all**; editing one cell in a 1.6 MB sheet changes **22 bytes** and touches two parts.
+`save(strategy: .generated)` gives you the old rebuild-from-the-model behaviour when you want
+it.
+
+It will not do everything. Adding, removing or reordering sheets is refused, as is editing a
+chart sheet or the master of a shared formula — each would break something the caller did not
+touch. And what it preserves it does not *understand*: it keeps your pivot caches and chart
+definitions byte for byte, and will not help you edit them. `PROPOSAL_surgical_save.md` §20
+lists the limits.
 
 ## Quick Start
 

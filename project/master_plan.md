@@ -258,6 +258,30 @@ works, so round-trip tests are structurally unable to find these:
 
 ---
 
+### Phase H: Surgical save (Complete) — 0.37.0
+
+The whole of `plans/proposals/PROPOSAL_surgical_save.md`, steps 1 through 6.
+
+- [x] Corpus fidelity harness, and the number that justified the work: **816 of 1,440 parts
+      lost**, 49 of 50 workbooks, 57% of every archive
+- [x] `origin`, `SaveStrategy`, `SaveManifest`, `Worksheet.changedCells`
+- [x] A read workbook saves its own archive back — **0 parts lost**, chartsheets, external
+      references and `calcPr` all surviving
+- [x] `WorksheetSplicer` — an edited sheet is edited, not regenerated. One cell in a 1.6 MB
+      sheet changes 22 bytes
+- [x] The archive traps: `calcChain` dropped with its content-type override, append-only string
+      and style tables, `StaleValuePolicy`
+- [x] Corpus green on both edit kinds, and a spliced 33-part model opens in Excel with no repair
+- [x] `save(to:)` will not overwrite somebody's model unasked, and writes atomically
+
+Three reader defects fell out of building it, all the same shape — something the reader knew
+and `init(xlsxData:)` did not carry across: the **shared string table** (so the first text a
+caller wrote took index 0, relabelling an unrelated cell), the **style table** (the same hazard,
+now handled by appending to the file's own part), and the **array-formula members** the writer
+was emitting as an empty `<f/>`.
+
+---
+
 ## Roadmap
 
 All implementation phases are complete, and the scope itself narrowed in 0.13.0:
@@ -279,14 +303,23 @@ what the corpus finds.
 
 ## Non-Goals
 
-- Charts or images
-- VBA macros
+**Authoring** these is out of scope. **Preserving** them is not, and since 0.37.0 a workbook
+read from a file keeps all of them byte for byte through a save — the distinction is the point
+of Phase H, and the list below meant both before it.
+
+- Charts or images — preserved, not authored or editable
+- VBA macros — preserved, not authored
 - Password protection
-- Pivot tables
+- Pivot tables — preserved along with their caches; `GETPIVOTDATA` reads rendered values in
+  SwiftExcelFunctions, and neither package builds a pivot
 
 ---
 
-*Last updated: 2026-09-20 -- reconciled against everything shipped since 2026-09-03,
+*Last updated: 2026-09-26 -- added Phase H (surgical save, 0.37.0) and reconciled Non-Goals
+against it: charts, macros and pivots are still not *authored* here, and are now *preserved*,
+which the old list did not distinguish and which is the whole point of the phase.
+
+Previously, 2026-09-20 -- reconciled against everything shipped since 2026-09-03,
 which was 27 releases (0.12.0 through 0.32.0) and left this document describing a package
 that no longer exists. The largest correction: the plan still claimed a formula **engine**
 with 70 built-in functions as a key differentiator, and listed `FormulaEvaluator`,
