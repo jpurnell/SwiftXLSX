@@ -42,7 +42,7 @@ struct Measurement {
         "unmodelledIn", "unmodelledOut", "cellsIn", "cellsOut", "formulasIn", "formulasOut",
         "externalRefsIn", "externalRefsOut", "calcPrIn", "calcPrOut",
         "chartsheetsIn", "chartsheetsOut", "dimensionIn", "dimensionOut",
-        "rereadable", "editReadBack",
+        "rereadable", "editReadBack", "targetHadFormula",
     ].joined(separator: "\t")
 
     let path: String
@@ -224,6 +224,12 @@ struct Measurement {
             "\(after.filter { $0.path.hasPrefix("xl/chartsheets/sheet") }.count)",
             Self.dimension(of: sheetIn), Self.dimension(of: sheetOut),
             "\(rereadable)", "\(readBack)",
+            // Whether the cell that was overwritten held a formula. `.replace` writes a number
+            // into the sheet's first populated cell, and where that cell was computed the
+            // formula count *should* fall by one — 25 of 2,234 corpus workbooks, each one
+            // checked by hand. Recorded so the summary can tell a correct fall from a wrong
+            // one rather than reporting both as failures.
+            "\(target.map { Self.heldAFormula(at: $0, in: sheetIn) } ?? false)",
         ]
     }
 
@@ -268,6 +274,23 @@ struct Measurement {
             return 0
         }
         return regex.numberOfMatches(in: text, range: NSRange(text.startIndex..., in: text))
+    }
+
+    /// Whether a cell carried an `<f>` element in the sheet as it was read.
+    private static func heldAFormula(at reference: CellRef, in xml: String) -> Bool {
+        guard let start = xml.range(of: "<c ") else { return false }
+        var search = start.lowerBound
+        while let open = xml.range(of: "<c ", range: search..<xml.endIndex) {
+            guard let close = xml.range(of: "</c>", range: open.upperBound..<xml.endIndex) else {
+                return false
+            }
+            let element = xml[open.lowerBound..<close.upperBound]
+            if element.contains("r=\"\(reference.reference)\"") {
+                return element.range(of: "<f[ >/]", options: .regularExpression) != nil
+            }
+            search = close.upperBound
+        }
+        return false
     }
 
     /// The `<dimension ref=…>` a sheet declares, or empty if it declares none.

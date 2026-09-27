@@ -140,13 +140,22 @@ struct FidelityRun {
         tally("unmodelled elements preserved") {
             number($0, "unmodelledIn") == number($0, "unmodelledOut")
         }
-        tally("formula count unchanged") {
-            number($0, "formulasIn") == number($0, "formulasOut")
+        // `.replace` writes a number over the sheet's first populated cell. Where that cell
+        // held a formula the count *should* fall by exactly one, and asserting "unchanged"
+        // reported 25 correct saves as failures.
+        tally("formula count as expected") {
+            let expected = number($0, "formulasIn")
+                - (value($0, "targetHadFormula") == "true" ? 1 : 0)
+            return number($0, "formulasOut") == expected
         }
         tally("externalReferences preserved") {
             number($0, "externalRefsIn") == number($0, "externalRefsOut")
         }
-        tally("calcPr preserved") { number($0, "calcPrIn") == number($0, "calcPrOut") }
+        // A workbook with no `<calcPr>` is *given* one when an edit marks it for
+        // recalculation, so 0 -> 1 is the feature working. Only losing one is a failure.
+        tally("calcPr preserved or added") {
+            number($0, "calcPrOut") >= number($0, "calcPrIn")
+        }
         tally("chartsheets preserved") {
             number($0, "chartsheetsIn") == number($0, "chartsheetsOut")
         }
