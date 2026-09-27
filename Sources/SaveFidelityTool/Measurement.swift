@@ -173,7 +173,16 @@ struct Measurement {
 
         let workbookIn = Self.text(before, "xl/workbook.xml")
         let workbookOut = Self.text(after, "xl/workbook.xml")
-        let sheetsIn = Self.worksheets(before), sheetsOut = Self.worksheets(after)
+
+        // Counted part by part, never joined. Joining every worksheet into one string cost the
+        // first full-corpus run its life: the corpus holds workbooks of eight million cells,
+        // and holding two concatenations of those alongside the archives, the parsed model and
+        // the re-parsed output was enough for the system to kill the process for memory. Each
+        // part is now decoded, counted and released before the next.
+        let cellsIn = Self.countAcrossWorksheets("<c[ />]", before)
+        let cellsOut = Self.countAcrossWorksheets("<c[ />]", after)
+        let formulasIn = Self.countAcrossWorksheets("<f[ >/]", before)
+        let formulasOut = Self.countAcrossWorksheets("<f[ >/]", after)
 
         var rereadable = false
         var readBack = target == nil
@@ -203,12 +212,10 @@ struct Measurement {
             // and a Google Sheets export writes `<c t="s" s="12" r="A1">`. Counting `<c r=`
             // undercounted one corpus input by 6,904 cells and made the writer look as though
             // it were inventing them.
-            "\(Self.matches("<c[ />]", in: sheetsIn))",
-            "\(Self.matches("<c[ />]", in: sheetsOut))",
+            "\(cellsIn)", "\(cellsOut)",
             // `<f` also prefixes `<filter>`, `<filters>` and `<filterColumn>` — autoFilter
             // criteria, not formulas.
-            "\(Self.matches("<f[ >/]", in: sheetsIn))",
-            "\(Self.matches("<f[ >/]", in: sheetsOut))",
+            "\(formulasIn)", "\(formulasOut)",
             "\(Self.occurrences(of: ["<externalReference"], in: workbookIn))",
             "\(Self.occurrences(of: ["<externalReference"], in: workbookOut))",
             "\(Self.occurrences(of: ["<calcPr"], in: workbookIn))",
@@ -229,10 +236,16 @@ struct Measurement {
         return String(decoding: entry.data, as: UTF8.self)
     }
 
-    private static func worksheets(_ entries: [ZIPEntry]) -> String {
-        entries.filter { $0.path.hasPrefix("xl/worksheets/sheet") }
-            .map { String(decoding: $0.data, as: UTF8.self) }
-            .joined()
+    /// Matches of a pattern across every worksheet part, summed without ever holding more
+    /// than one part's text at a time.
+    private static func countAcrossWorksheets(_ pattern: String, _ entries: [ZIPEntry]) -> Int {
+        var total = 0
+        for entry in entries where entry.path.hasPrefix("xl/worksheets/sheet") {
+            autoreleasepool {
+                total += matches(pattern, in: String(decoding: entry.data, as: UTF8.self))
+            }
+        }
+        return total
     }
 
     private static func occurrences(of needles: [String], in text: String) -> Int {

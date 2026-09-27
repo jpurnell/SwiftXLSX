@@ -78,7 +78,10 @@ struct FidelityRun {
         var rows: [String] = []
         for (index, path) in batch.enumerated() {
             mark(path)
-            let row = Measurement(path: path, edit: edit).row(under: root)
+            // Each workbook's archives, parsed model and re-parsed output are released before
+            // the next one is opened. Without this the run accumulated enough that the system
+            // killed it for memory 1,384 workbooks in.
+            let row = autoreleasepool { Measurement(path: path, edit: edit).row(under: root) }
             handle.write(Data((row + "\n").utf8))
             flush(handle, after: path)
             rows.append(row)
