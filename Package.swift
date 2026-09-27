@@ -8,6 +8,7 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .library(name: "SwiftXLSX", targets: ["SwiftXLSX"]),
+        .executable(name: "save-fidelity", targets: ["SaveFidelityTool"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
@@ -28,6 +29,21 @@ let package = Package(
             ],
             path: "Sources/SwiftXLSX",
             resources: [.process("SwiftXLSX.docc")]
+        ),
+        // The pass/fail for `PROPOSAL_surgical_save.md`, over a corpus of real workbooks.
+        // An executable rather than a test, for the reason this family keeps rediscovering:
+        // a test over thousands of files prints only at the end, cannot resume, and cannot
+        // be told from a hung one. The run that produced the proposal's numbers lived in a
+        // throwaway package until 2026-09-26, which is the other reason — a gate that cannot
+        // be re-run is not a gate.
+        .executableTarget(
+            name: "SaveFidelityTool",
+            dependencies: [
+                "SwiftXLSX",
+                .product(name: "SwiftZIP", package: "SwiftZIP"),
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
+            ],
+            path: "Sources/SaveFidelityTool"
         ),
         .testTarget(
             name: "SwiftXLSXTests",

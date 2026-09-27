@@ -775,9 +775,32 @@ dates rather than asserted by this package's reading of the XML.
 
 Not separately confirmed: the two charts, which live on sheets the screenshots did not show.
 
-### 19.4 The harness is in a scratchpad
+### 19.4 The harness, now in the repository
 
-§17 calls this run "the pass/fail", and it currently lives in a throwaway package outside the
-repository. A gate that cannot be re-run is not a gate. It belongs beside `workbook-oracle` and
-`name-round-trip` as an executable over the private corpus — the same shape, the same resume
-rule, the same reason.
+~~§17 calls this run "the pass/fail", and it currently lives in a throwaway package outside the
+repository.~~ **Moved 2026-09-26.** `swift run save-fidelity <corpus> --edit none|replace|insert`
+— `Sources/SaveFidelityTool`, the same shape as `workbook-oracle` and `name-round-trip`: a row
+per workbook, flushed, the output file as the resume state, and a marker naming the file being
+opened so a workbook that kills the run costs one workbook rather than the rest of it.
+
+It reproduces §19.1 and §19.2 exactly, and reports a summary rather than a table to read by
+eye:
+
+```
+workbooks 50   edit replace
+  ✓ no part lost but the calculation chain: 50/50
+    (the chain was dropped in 36 of 50; the rest had none to drop)
+  ✓ re-readable after saving: 50/50
+  ✓ the edit reads back: 50/50
+  ✓ every other sheet byte-identical: 50/50
+  ✓ unmodelled elements preserved: 50/50
+  ✓ externalReferences preserved: 50/50
+  ✓ calcPr preserved: 50/50
+  ✓ chartsheets preserved: 50/50
+```
+
+Two things it taught while being written down. The corpus is **2,242 workbooks**, not the fifty
+every figure here is drawn from — the samples are a first fifty in sorted order, and a full run
+is available now that re-running is cheap. And the first version of the summary marked the
+dropped calculation chain as a lost part, failing thirty-six correct saves: an edit is *meant*
+to drop it, and a gate that cries wolf is one people learn to skip.

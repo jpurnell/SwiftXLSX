@@ -7,6 +7,32 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`save-fidelity`, an executable** — the pass/fail for
+  `project/plans/proposals/PROPOSAL_surgical_save.md`, over a corpus of real workbooks.
+
+  ```
+  swift run save-fidelity ~/Documents --edit replace --out splice.tsv
+  ```
+
+  Three modes. `--edit none` opens each workbook and saves it, and every part should come back
+  byte for byte — the number that went from 816 parts lost out of 1,440 to zero. `--edit
+  replace` overwrites a populated cell; `--edit insert` writes past the end of the sheet,
+  forcing a new `<row>` and a wider `<dimension>`. Each run reports whether anything was lost,
+  whether the result re-reads with the edit in it, whether every *other* sheet stayed
+  byte-identical, and whether the in-sheet elements a regeneration would have dropped are still
+  there.
+
+  An executable rather than a test, for the reason this family keeps rediscovering: a run over
+  thousands of files prints only at the end, cannot resume, and cannot be told from a hung one.
+  A row per workbook, flushed, with the output file as the resume state and a marker naming the
+  file being opened — one corpus workbook takes ten minutes and two earlier runs stalled on the
+  same one.
+
+  It exists because the runs that produced §18 and §19 of the proposal lived in a throwaway
+  package outside the repository, and a gate that cannot be re-run is not a gate.
+
 ### Changed
 
 - **`Worksheet.originPart` is public.** The part path is the only thing that tells a caller what
