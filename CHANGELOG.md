@@ -7,6 +7,27 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`StaleValuePolicy`, and an edit now tells Excel to recalculate.** Every formula cell carries
+  the value Excel last computed for it; change a precedent and its dependents' caches are lies,
+  and a surgical save deliberately leaves those cells alone — so until now nothing in the file
+  said so. A save with edits sets `fullCalcOnLoad="1"` on `<calcPr>`, adding the element before
+  `<extLst>` if the workbook had none, and correcting an explicit `fullCalcOnLoad="0"`.
+
+  **`.untouched` declines it, and the reason is real.** §18.4 of the proposal amended §3.3 on
+  the strength of a workbook: forcing a recalculation is honest when Excel can resolve every
+  function in the file and ruinous when it cannot. A Risk Solver model opened without the add-in
+  recalculates `_xll.PsiNormal(…)` to `#NAME?` and cascades it, and there the stale cache is
+  worth more than the honest one.
+
+  A caller who *has* an evaluator needs no third case: they write the recomputed values in as
+  ordinary cell edits and the splice puts them where they belong.
+
+  `save(strategy:staleValues:)`, `save(to:strategy:overwriting:staleValues:)` and
+  `saveManifest(strategy:staleValues:)` all take it, with the same default, because a manifest
+  describing a different save than the one about to happen would be worse than none.
+
 ### Changed
 
 - **`save(to:)` will not write over somebody's model without being told to.** For a workbook
@@ -25,7 +46,7 @@
   regenerates a report over yesterday's copy. Every call site in the sibling repositories
   composes in code, so this breaks none of them.
 
-  `save(to:)` also takes `strategy:` now, matching `save(strategy:)`.
+  `save(to:)` also takes `strategy:` and `staleValues:` now, matching `save(strategy:staleValues:)`.
 
 - **`save(to:)` writes atomically.** The bytes land in a temporary file that replaces the
   destination only once all of them are written, so a failure partway through leaves the

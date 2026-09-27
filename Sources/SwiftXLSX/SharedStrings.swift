@@ -11,6 +11,15 @@ public final class SharedStrings: @unchecked Sendable {
     /// Every string, in index order.
     var all: [String] { strings }
 
+    /// Whether the table already holds a string, without adding it.
+    ///
+    /// For a caller that needs to know whether writing it *would* append — `index(for:)`
+    /// answers that question by making it untrue.
+    ///
+    /// - Parameter string: The string to look for.
+    /// - Returns: `true` if it is already in the table.
+    func contains(_ string: String) -> Bool { lookup[string] != nil }
+
     /// Adopts the table read from a file, in file order.
     ///
     /// **Indices are positional, and cells hold the index rather than the string.** A cell

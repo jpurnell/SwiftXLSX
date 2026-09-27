@@ -26,18 +26,24 @@ extension Workbook {
     /// relationships, the content types and every unspliced sheet still point at the old ones;
     /// there is no way to renumber them without regenerating the parts this exists to protect.
     ///
-    /// - Parameter strategy: Which strategy to use. Defaults to ``defaultSaveStrategy``.
+    /// - Parameters:
+    ///   - strategy: Which strategy to use. Defaults to ``defaultSaveStrategy``.
+    ///   - staleValues: What to do about the cached values an edit has invalidated. Defaults
+    ///     to ``StaleValuePolicy/markForRecalculation``, which is correct for any workbook
+    ///     whose formulas Excel can resolve on its own.
     /// - Returns: The complete `.xlsx` archive as `Data`.
     /// - Throws: ``SaveError/noOriginArchive`` if ``SaveStrategy/surgical`` is asked of a
     ///   workbook composed in code, ``SaveError/structuralChangeUnsupported(reason:)`` if the
     ///   sheets have changed, or an error if the archive cannot be written.
-    public func save(strategy: SaveStrategy?) throws -> Data {
+    public func save(strategy: SaveStrategy?,
+                     staleValues: StaleValuePolicy = .markForRecalculation) throws -> Data {
         switch strategy ?? defaultSaveStrategy {
         case .generated:
             return try SwiftZIP.ZIPWriter.write(entries: generatedParts())
         case .surgical:
             guard let origin else { throw SaveError.noOriginArchive }
-            return try SwiftZIP.ZIPWriter.write(entries: surgicalParts(from: origin))
+            return try SwiftZIP.ZIPWriter.write(
+                entries: surgicalParts(from: origin, staleValues: staleValues))
         }
     }
 
@@ -48,7 +54,8 @@ extension Workbook {
     ///   the stale calculation chain removed.
     /// - Throws: ``SaveError/structuralChangeUnsupported(reason:)`` if the sheets no longer
     ///   correspond to the ones that were read.
-    private func surgicalParts(from origin: [ZIPEntry]) throws -> [ZIPEntry] {
+    private func surgicalParts(from origin: [ZIPEntry],
+                               staleValues: StaleValuePolicy) throws -> [ZIPEntry] {
         // Every sheet must still be one that was read. A sheet added in code has no origin
         // part, and there is nowhere to put it without renumbering parts that preserved
         // relationships point at.
@@ -72,12 +79,24 @@ extension Workbook {
         // that is absent is itself a repair.
         let dropChain = !edited.isEmpty
 
+        // An edit makes every dependent's cached value a lie, and the cells holding them are
+        // exactly the ones a splice does not touch. Telling Excel to recalculate is how the
+        // file stops claiming numbers nothing computed — unless the caller has declined,
+        // which `StaleValuePolicy` explains.
+        let markForRecalculation = !edited.isEmpty && staleValues == .markForRecalculation
+
         var result: [ZIPEntry] = []
         for entry in origin {
             if dropChain, entry.path == Self.calculationChainPart { continue }
             if dropChain, entry.path == "[Content_Types].xml" {
                 result.append(ZIPEntry(path: entry.path,
                                        data: Self.withoutCalculationChain(entry.data)))
+                continue
+            }
+            if markForRecalculation, entry.path == "xl/workbook.xml",
+               replacements[entry.path] == nil {
+                result.append(ZIPEntry(path: entry.path,
+                                       data: Self.recalculatingOnLoad(entry.data)))
                 continue
             }
             result.append(ZIPEntry(path: entry.path, data: replacements[entry.path] ?? entry.data))
@@ -157,6 +176,46 @@ extension Workbook {
             return WorksheetSplicer.Edit(reference: reference,
                                          value: entry.0, style: entry.1)
         }
+    }
+
+    /// The workbook part, with `<calcPr>` told to recalculate everything on open.
+    ///
+    /// Three shapes to handle, and the third is why this is not a string replacement:
+    ///
+    /// - `<calcPr calcId="191029"/>` — add the attribute, keep the others.
+    /// - `<calcPr … fullCalcOnLoad="0"/>` — an explicit instruction *not* to recalculate,
+    ///   which an edit has just made wrong.
+    /// - no `<calcPr>` at all — add one, **before `<extLst>`**. The schema fixes the order of
+    ///   a workbook's children, and Excel repairs a file that gets it wrong by deleting what
+    ///   it could not place.
+    ///
+    /// - Parameter data: The original `xl/workbook.xml`.
+    /// - Returns: The same XML, recalculating on load.
+    private static func recalculatingOnLoad(_ data: Data) -> Data {
+        var text = String(decoding: data, as: UTF8.self)
+        if let element = text.range(of: "<calcPr[^>]*>", options: .regularExpression) {
+            var attributes = String(text[element])
+                .replacingOccurrences(of: "<calcPr", with: "")
+                .replacingOccurrences(of: "/>", with: "")
+                .replacingOccurrences(of: ">", with: "")
+            if let existing = attributes.range(of: "\\s*fullCalcOnLoad=\"[^\"]*\"",
+                                               options: .regularExpression) {
+                attributes.removeSubrange(existing)
+            }
+            let trimmed = attributes.trimmingCharacters(in: .whitespacesAndNewlines)
+            let separator = trimmed.isEmpty ? "" : " "
+            text.replaceSubrange(
+                element, with: "<calcPr\(separator)\(trimmed) fullCalcOnLoad=\"1\"/>")
+            return Data(text.utf8)
+        }
+        let added = "<calcPr fullCalcOnLoad=\"1\"/>"
+        if let extensions = text.range(of: "<extLst") {
+            text.insert(contentsOf: added, at: extensions.lowerBound)
+            return Data(text.utf8)
+        }
+        guard let close = text.range(of: "</workbook>") else { return data }
+        text.insert(contentsOf: added, at: close.lowerBound)
+        return Data(text.utf8)
     }
 
     /// The content types with the calculation chain's override removed.

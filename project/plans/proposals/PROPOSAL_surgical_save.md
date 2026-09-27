@@ -658,9 +658,17 @@ public enum StaleValuePolicy: Sendable, Equatable {
 }
 ```
 
-`.recomputed` cannot be implemented in SwiftXLSX — the evaluator is upstream in
-SwiftExcelFunctions — so the shape is probably a closure the caller supplies, and the default
-stays `.markForRecalculation`.
+**Built 2026-09-26, and simpler than this sketch.** `.recomputed` turned out not to be a case
+at all: a caller who has an evaluator writes the recomputed values in as ordinary cell edits,
+and the splice puts them where they belong. No closure, no dependency on an evaluator this
+package does not have. Two cases, `.markForRecalculation` and `.untouched`, and the default is
+the first.
+
+The implementation handles three shapes of `<calcPr>`: add the attribute to an existing
+element keeping its `calcId`; correct an explicit `fullCalcOnLoad="0"`, which an edit has just
+made wrong; and create the element where there is none — **before `<extLst>`**, because the
+schema fixes the order of a workbook's children and Excel repairs a file that gets it wrong by
+deleting what it could not place.
 
 ### 18.5 What this does to the sequencing
 
@@ -676,7 +684,16 @@ stays `.markForRecalculation`.
 | 5 | the three archive traps | **add `StaleValuePolicy` (§18.4)** |
 | 6 | corpus fidelity green | re-run this harness; it is the pass/fail |
 
-**Next action:** `StaleValuePolicy` (§18.4), then the style table.
+**Next action:** the style table, which is all that remains.
+
+`ParsedStyleSheet` holds what the reader read; the workbook's own `StyleSheet` is never filled
+from it, which is why adding a *styled* new cell to a read workbook is refused. Lifting it is
+not just adopting the table: `StyleSheet.toXML()` regenerates `xl/styles.xml` from `CellStyle`,
+which models less than a real styles part holds, so writing it back would degrade the
+formatting of every cell in the file. The append-only answer — a new `<xf>` on the end of the
+original `<cellXfs>`, with whatever `<numFmt>`, `<font>` or `<fill>` it needs — is the same
+shape as the shared-string fix and is what §3.3 asks for. Until then the refusal is correct and
+says why.
 
 Steps 1–4 are done, 2a is withdrawn, and step 5 is two-thirds done. What is left is the one
 thing §18.4 amended rather than inherited: `fullCalcOnLoad` is honest and wrong for a workbook

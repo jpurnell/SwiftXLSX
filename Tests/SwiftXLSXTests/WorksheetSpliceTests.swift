@@ -216,6 +216,26 @@ struct WorksheetSpliceTests {
         #expect(after.contains("<c r=\"C1\" s=\"7\"/>"), "C1 should be empty and still styled")
     }
 
+    /// **The manifest says so, and says so precisely.** A splice reuses the indices already in
+    /// the file, so the string table is written only when an edit puts a string in it that was
+    /// not there. Claiming it always changes would overstate the cost of every edit.
+    @Test("the manifest names the string table only when a string is actually new")
+    func manifestNamesTheStringTableWhenItMustGrow() throws {
+        let fresh = try Workbook(xlsxData: try package())
+        try #require(fresh.sheets.first).write("South", to: "C1")
+        #expect(try fresh.saveManifest().rewritten.contains("xl/sharedStrings.xml"),
+                "\"South\" is not in the file's table, so the table has to grow")
+
+        let reused = try Workbook(xlsxData: try package())
+        try #require(reused.sheets.first).write("North", to: "C1")
+        #expect(!(try reused.saveManifest().rewritten.contains("xl/sharedStrings.xml")),
+                "\"North\" is already index 1, so nothing is appended")
+
+        let numeric = try Workbook(xlsxData: try package())
+        try #require(numeric.sheets.first).write(42.0, to: "C1")
+        #expect(!(try numeric.saveManifest().rewritten.contains("xl/sharedStrings.xml")))
+    }
+
     // MARK: - Refusing what would break other cells
 
     /// **A shared formula's master carries the text its followers use.** `A2` holds

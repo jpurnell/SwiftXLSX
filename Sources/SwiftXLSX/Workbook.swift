@@ -172,17 +172,20 @@ public final class Workbook: @unchecked Sendable {
     ///   - strategy: Which strategy to use. Defaults to ``defaultSaveStrategy``.
     ///   - overwriting: Permission to replace an existing file, required only for a workbook
     ///     that was read from one.
+    ///   - staleValues: What to do about the cached values an edit has invalidated. See
+    ///     ``StaleValuePolicy``.
     /// - Throws: ``SaveError/destinationExists(_:)`` if something is already there and
-    ///   `overwriting` is `false`, or whatever ``save(strategy:)`` throws.
+    ///   `overwriting` is `false`, or whatever ``save(strategy:staleValues:)`` throws.
     public func save(to url: URL, strategy: SaveStrategy? = nil,
-                     overwriting: Bool = false) throws {
+                     overwriting: Bool = false,
+                     staleValues: StaleValuePolicy = .markForRecalculation) throws {
         // Checked before anything is generated, let alone written. A guard that fires after
         // truncating the file destroys the model *and* reports an error, which leaves the
         // caller believing nothing happened.
         if origin != nil, !overwriting, Self.somethingExists(at: url) {
             throw SaveError.destinationExists(url)
         }
-        let data = try save(strategy: strategy)
+        let data = try save(strategy: strategy, staleValues: staleValues)
         try data.write(to: url, options: .atomic)
     }
 
@@ -214,7 +217,7 @@ public final class Workbook: @unchecked Sendable {
     /// Saves the workbook as in-memory `.xlsx` data, using ``defaultSaveStrategy``.
     ///
     /// Surgically if this workbook was read from a file, from the in-memory model if it was
-    /// composed in code. ``save(strategy:)`` explains the difference and why it follows
+    /// composed in code. ``save(strategy:staleValues:)`` explains the difference and why it follows
     /// provenance rather than an argument.
     ///
     /// - Returns: The complete `.xlsx` archive as `Data`.

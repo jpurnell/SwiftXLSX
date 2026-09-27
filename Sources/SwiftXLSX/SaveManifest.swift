@@ -23,6 +23,35 @@ public enum SaveStrategy: Sendable, Equatable {
     case surgical
 }
 
+/// What an edit does about the cached values it has just made wrong.
+///
+/// Every formula cell carries the value Excel last computed for it. A surgical save
+/// deliberately leaves untouched cells untouched, so after an edit their caches are stale and
+/// nothing in the file says so.
+///
+/// **Marking is right, except when it is destructive.** §3.3 of the proposal chose
+/// `fullCalcOnLoad` unconditionally, and §18.4 amended it: forcing a recalculation is honest
+/// when Excel can resolve every function in the file, and ruinous when it cannot. A Risk
+/// Solver model opened without the add-in recalculates `_xll.PsiNormal(…)` to `#NAME?` and
+/// cascades that through everything downstream — there, the stale cache is worth more than the
+/// honest one.
+///
+/// A caller who *has* an evaluator needs no third case: they write the recomputed values in as
+/// ordinary cell edits, and the splice puts them where they belong.
+public enum StaleValuePolicy: Sendable, Equatable {
+
+    /// Tell Excel to recalculate everything when it opens the file.
+    ///
+    /// The default, and correct for any workbook whose formulas Excel knows.
+    case markForRecalculation
+
+    /// Leave the calculation settings exactly as they were.
+    ///
+    /// For a workbook Excel cannot recalculate correctly on its own, and for a caller who
+    /// knows the edit changed nothing downstream.
+    case untouched
+}
+
 /// What a save will do, part by part.
 ///
 /// Public because a caller about to overwrite somebody's model should be able to show them
@@ -114,6 +143,21 @@ public enum SaveError: Error, Sendable, Equatable {
 
 extension Workbook {
 
+    /// Whether any pending edit writes a string the shared table does not already hold.
+    ///
+    /// A cell holds an index into that table, so a string that is already there costs nothing
+    /// and one that is not has to go on the end of it.
+    var appendsASharedString: Bool {
+        for sheet in sheets where sheet.hasUnsavedChanges {
+            for reference in sheet.changedCells {
+                guard case .text(let value)? = sheet.entry(at: reference.reference)?.0,
+                      !sharedStrings.contains(value) else { continue }
+                return true
+            }
+        }
+        return false
+    }
+
     /// ``SaveStrategy/surgical`` if this workbook was read from an archive,
     /// ``SaveStrategy/generated`` if it was composed in code.
     public var defaultSaveStrategy: SaveStrategy {
@@ -130,12 +174,18 @@ extension Workbook {
     /// the reader reads pivot tables, pivot caches and per-sheet relationships that the writer
     /// does not emit, so it would mark those as rewritten and drop them.
     ///
-    /// - Parameter strategy: Which strategy to describe. Defaults to
-    ///   ``defaultSaveStrategy``.
+    /// - Parameters:
+    ///   - strategy: Which strategy to describe. Defaults to ``defaultSaveStrategy``.
+    ///   - staleValues: What that save would do about the cached values an edit invalidates.
+    ///     Takes the same default as ``save(strategy:staleValues:)``, because a manifest that
+    ///     described a different save than the one about to happen would be worse than none.
     /// - Returns: The manifest.
     /// - Throws: ``SaveError/noOriginArchive`` if ``SaveStrategy/surgical`` is asked of a
     ///   workbook composed in code.
-    public func saveManifest(strategy: SaveStrategy? = nil) throws -> SaveManifest {
+    public func saveManifest(
+        strategy: SaveStrategy? = nil,
+        staleValues: StaleValuePolicy = .markForRecalculation
+    ) throws -> SaveManifest {
         let strategy = strategy ?? defaultSaveStrategy
         let edited = sheets.filter(\.hasUnsavedChanges)
         let forcesRecalculation = !edited.isEmpty
@@ -167,9 +217,17 @@ extension Workbook {
             guard let part = sheet.originPart else { continue }
             rewritten.append(part)
         }
-        if !rewritten.isEmpty {
-            // A regenerated sheet writes fresh indices into both tables, so both go with it.
-            rewritten.append(contentsOf: ["xl/sharedStrings.xml", "xl/styles.xml"])
+        // A splice reuses the indices already in the file, so the string table is written only
+        // when an edit puts a string in it that was not there. Asked precisely rather than
+        // assumed: claiming it always changes would overstate the blast radius of every edit,
+        // and never claiming it would understate the one edit where it matters.
+        if appendsASharedString {
+            rewritten.append("xl/sharedStrings.xml")
+        }
+        // Marking the file for recalculation edits `<calcPr>`, so the workbook part changes
+        // too — and a caller being shown this before agreeing to it should see that.
+        if forcesRecalculation, staleValues == .markForRecalculation {
+            rewritten.append("xl/workbook.xml")
         }
         let rewrittenSet = Set(rewritten)
 
