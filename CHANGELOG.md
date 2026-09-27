@@ -7,6 +7,17 @@
 
 ## [Unreleased]
 
+## [0.37.1] - 2026-09-27
+
+**Upgrade from 0.37.0.** That release could corrupt `xl/workbook.xml` when saving an edited
+workbook whose `<calcPr>` is written as a pair rather than self-closed — silent damage in a
+release whose whole point is not damaging files. Two workbooks in a 2,242-workbook corpus are
+written that way, and both were broken by it.
+
+Also in this release: the corpus harness that found it now runs to completion. It held every
+worksheet of a workbook in memory at once and was killed by the system 1,384 workbooks into the
+first full run, and two of its checks reported correct saves as failures.
+
 ### Fixed
 
 - **A `<calcPr>` written as a pair no longer corrupts the workbook part.** Marking a file for
@@ -25,6 +36,17 @@
   exactly **two** write `<calcPr>` as a pair. Every test for the feature used the self-closing
   spelling, which is why nothing caught it — and why the sample of fifty that every other figure
   came from did not either.
+
+- **`save-fidelity` runs to completion, and stops crying wolf.** It joined every worksheet part
+  of a workbook into one string to count cells and formulas, for the input and the output both;
+  the corpus holds workbooks of nearly eight million cells, and the system killed the first full
+  run for memory 1,384 workbooks in. Counting is now done part by part, verified
+  measurement-neutral over 50 workbooks × 27 columns before being trusted.
+
+  Two of its checks also failed correct saves. Overwriting a cell that held a formula *should*
+  lower the formula count by one — 25 of 2,234 corpus workbooks, each verified against the
+  source before the assertion was changed. And a workbook with no `<calcPr>` is *given* one when
+  an edit marks it for recalculation, so `0 → 1` is the feature working.
 
 ## [0.37.0] - 2026-09-26
 
