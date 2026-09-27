@@ -149,6 +149,20 @@ anything.
 permission. Losing an unbacked-up model to a bug in this feature is the outcome that would make
 the feature not worth having.
 
+**Done 2026-09-26.** `save(to:strategy:overwriting:)`, throwing `destinationExists(_:)`. Two
+things the implementation added to the design:
+
+- The check runs **before anything is generated**, not at the write. A guard that fires after
+  truncating the file destroys the model *and* reports an error, and the caller then believes
+  nothing happened. There is a test for exactly that: the bytes on disk after a refused save
+  must equal the bytes before it.
+- The write is **atomic** regardless of the guard, for every workbook. `Data.write(to:)`
+  without `.atomic` leaves a truncated file if anything fails partway, which is the same loss
+  the guard exists to prevent arriving by a different route.
+
+Checked against the consumers before landing: every `save(to:)` call site in the sibling
+repositories composes its workbook in code, so none of them is affected.
+
 ---
 
 ## 4. API Surface
@@ -662,7 +676,7 @@ stays `.markForRecalculation`.
 | 5 | the three archive traps | **add `StaleValuePolicy` (§18.4)** |
 | 6 | corpus fidelity green | re-run this harness; it is the pass/fail |
 
-**Next action:** step 5's remainder — `StaleValuePolicy` (§18.4) — then step 6.
+**Next action:** `StaleValuePolicy` (§18.4), then the style table.
 
 Steps 1–4 are done, 2a is withdrawn, and step 5 is two-thirds done. What is left is the one
 thing §18.4 amended rather than inherited: `fullCalcOnLoad` is honest and wrong for a workbook
@@ -671,8 +685,6 @@ in — needs an evaluator this package does not have. It is a closure the caller
 
 Also outstanding and not yet scheduled:
 
-- **§3.4, `overwriting:`** — `save(to:)` still overwrites without asking. A behavioural break
-  worth doing deliberately, with its own tests.
 - **The style table.** The reader parses `xl/styles.xml` into `ParsedStyleSheet` and never fills
   the workbook's `StyleSheet`, which is why a styled new cell is refused. Loading it would lift
   that, and is the same defect shape as the shared strings fixed in step 4.

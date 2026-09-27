@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(os)
+import os
+#endif
 import SwiftZIP
 import SwiftExcelCore
 
@@ -148,9 +151,64 @@ public final class Workbook: @unchecked Sendable {
     }
 
     /// Saves the workbook as an XLSX file at the given URL.
-    public func save(to url: URL) throws {
-        let data = try save()
-        try data.write(to: url)
+    ///
+    /// ## Overwriting somebody's model is a decision, not a default
+    ///
+    /// For a workbook that was **read from a file**, writing over a file that already exists
+    /// requires `overwriting: true`. The shape this guards is the one this library exists to
+    /// serve — open a model, change a cell, write it back over itself — and it is also the one
+    /// that destroys the original if anything goes wrong on the way.
+    ///
+    /// A workbook composed in code is unaffected. It has no origin, so there is no model of
+    /// somebody's that it could be standing on, and refusing there would break every caller
+    /// that regenerates a report over yesterday's copy.
+    ///
+    /// The write is atomic either way: the bytes land in a temporary file that replaces the
+    /// destination only once all of them are written, so a failure partway through leaves the
+    /// previous file intact rather than a truncated one where a model used to be.
+    ///
+    /// - Parameters:
+    ///   - url: Where to write.
+    ///   - strategy: Which strategy to use. Defaults to ``defaultSaveStrategy``.
+    ///   - overwriting: Permission to replace an existing file, required only for a workbook
+    ///     that was read from one.
+    /// - Throws: ``SaveError/destinationExists(_:)`` if something is already there and
+    ///   `overwriting` is `false`, or whatever ``save(strategy:)`` throws.
+    public func save(to url: URL, strategy: SaveStrategy? = nil,
+                     overwriting: Bool = false) throws {
+        // Checked before anything is generated, let alone written. A guard that fires after
+        // truncating the file destroys the model *and* reports an error, which leaves the
+        // caller believing nothing happened.
+        if origin != nil, !overwriting, Self.somethingExists(at: url) {
+            throw SaveError.destinationExists(url)
+        }
+        let data = try save(strategy: strategy)
+        try data.write(to: url, options: .atomic)
+    }
+
+    /// Whether anything is already at `url`.
+    ///
+    /// Asked of the `URL` rather than of `FileManager` and a path string: standardising first
+    /// resolves a `..` in what the caller passed once, here, instead of leaving the filesystem
+    /// to honour it after this has said there was nothing there. It is also the only
+    /// filesystem question this library asks, and it would rather not learn to ask them by
+    /// path.
+    private static func somethingExists(at url: URL) -> Bool {
+        do {
+            return try url.standardizedFileURL.checkResourceIsReachable()
+        } catch {
+            // Unreachable is the ordinary answer for a destination nothing has been written to
+            // yet — a result, not a failure. Recorded rather than raised, because "there is
+            // nothing there" and "this could not be determined" would otherwise look alike.
+            #if canImport(os)
+            Logger(subsystem: "SwiftXLSX", category: "save")
+                .debug("""
+                    nothing at \(url.lastPathComponent, privacy: .public): \
+                    \(String(describing: error), privacy: .public)
+                    """)
+            #endif
+            return false
+        }
     }
 
     /// Saves the workbook as in-memory `.xlsx` data, using ``defaultSaveStrategy``.

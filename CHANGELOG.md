@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`save(to:)` will not write over somebody's model without being told to.** For a workbook
+  that was read from a file, writing to a path that already exists now throws
+  `SaveError.destinationExists(_:)` unless `overwriting: true` is passed. §3.4 of
+  `project/plans/proposals/PROPOSAL_surgical_save.md`.
+
+  The shape this guards is the one the surgical save exists to serve — open a model, change a
+  cell, write it back over itself — and it is the one that destroys the original if anything
+  goes wrong on the way. The check runs **before** anything is generated or written: a guard
+  that fires after truncating the file destroys the model *and* reports an error, which leaves
+  the caller believing nothing happened.
+
+  A workbook composed in code is unaffected. It has no origin, so there is nothing of
+  somebody's that it could be standing on, and refusing there would break every caller that
+  regenerates a report over yesterday's copy. Every call site in the sibling repositories
+  composes in code, so this breaks none of them.
+
+  `save(to:)` also takes `strategy:` now, matching `save(strategy:)`.
+
+- **`save(to:)` writes atomically.** The bytes land in a temporary file that replaces the
+  destination only once all of them are written, so a failure partway through leaves the
+  previous file intact rather than a truncated one. This applies to every workbook, composed
+  or read.
+
 ### Added
 
 - **`save-fidelity`, an executable** — the pass/fail for
