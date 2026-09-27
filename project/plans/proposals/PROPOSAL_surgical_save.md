@@ -749,18 +749,31 @@ Two columns and three rows beyond `lastPopulatedCell`, so a `<row>` has to be cr
 The four without a `<dimension>` are left without one: absent is legal, and inventing one is a
 change nobody asked for.
 
-### 19.3 What is still not verified: Excel
+### 19.3 Excel, opened
 
-**No file produced by any of this has been opened in Excel.** Everything above is this
-package reading its own output, and a workbook that satisfies this package can still make Excel
-offer to repair it. That is the half of step 6 that cannot be automated here.
+**Verified 2026-09-26, Excel for Mac.** `DNREARN-edited-one-cell.xlsx` — the decomposed Goldman
+model with `Production!BU8` (the 1Q04 oil rate) changed from `18.1` to `123.456`, 32 of its 33
+parts byte-identical to the file it came from.
 
-`~/Desktop/DNREARN-edited-one-cell.xlsx` is the candidate: the decomposed Goldman model with
-one cell changed — `Production!BU8`, the 1Q04 oil rate, `18.1` → `123.456`. It carries two
-charts, three external links, two comment parts and VML drawings, and of its 33 parts **32 are
-byte-identical** to the file it came from; the only change is `xl/worksheets/sheet4.xml`, which
-is identical apart from that one `<c>`. Opening it should show: no repair dialog, both charts,
-the comments, and the production and earnings rows recalculating off the new rate.
+| | |
+|---|---|
+| repair dialog | **none** |
+| prompt shown | the external-links trust prompt, *"This workbook contains links to one or more external sources"* |
+| sheets | all four — `SnapShot`, `Reserves`, `template`, `Production` |
+| the edit | `Production!BU8` reads **123.46** in the 1Q04 column |
+| derived day counts | row 6 computes `90, 91, 92, 92` for 2006 from the quarter-end dates |
+| an untouched sheet's formulas | `Reserves!J21` reads `=J39+J48/6` |
+
+**The link prompt is the pass, not a caveat.** It is the standard prompt any workbook with
+external references shows, and it can only appear because `<externalReferences>` and the three
+`xl/externalLinks/` parts came through — the exact table that a regenerated `xl/workbook.xml`
+drops, leaving `'[2]Oil&Gas'!AZ3` pointing at nothing and no prompt at all.
+
+**2Q06 reading 91 days is the other thing worth naming.** That is the day-count defect from the
+original model, corrected by the decomposition and now computed by *Excel* from the quarter-end
+dates rather than asserted by this package's reading of the XML.
+
+Not separately confirmed: the two charts, which live on sheets the screenshots did not show.
 
 ### 19.4 The harness is in a scratchpad
 
