@@ -684,16 +684,36 @@ deleting what it could not place.
 | 5 | the three archive traps | **add `StaleValuePolicy` (§18.4)** |
 | 6 | corpus fidelity green | re-run this harness; it is the pass/fail |
 
-**Next action:** the style table, which is all that remains.
+**Next action:** none. Every step of this proposal is done — see §20 for what is deliberately
+still not supported.
 
-`ParsedStyleSheet` holds what the reader read; the workbook's own `StyleSheet` is never filled
-from it, which is why adding a *styled* new cell to a read workbook is refused. Lifting it is
-not just adopting the table: `StyleSheet.toXML()` regenerates `xl/styles.xml` from `CellStyle`,
-which models less than a real styles part holds, so writing it back would degrade the
-formatting of every cell in the file. The append-only answer — a new `<xf>` on the end of the
-original `<cellXfs>`, with whatever `<numFmt>`, `<font>` or `<fill>` it needs — is the same
-shape as the shared-string fix and is what §3.3 asks for. Until then the refusal is correct and
-says why.
+---
+
+## 20. What a surgical save still cannot do
+
+Recorded 2026-09-26, once steps 1–6 were done, because "preserved but not understood" is the
+honest description of most of this and the article §16 promises should say so.
+
+**Structural change is refused.** Adding, removing or reordering sheets moves part paths that
+preserved relationships, the content types and every unspliced sheet still point at.
+`SaveError.structuralChangeUnsupported`.
+
+**A chart sheet cannot be edited.** The reader has no parser for `xl/chartsheets/sheetN.xml`, so
+one arrives looking like an ordinary empty worksheet — and arrives *first* in the corpus
+workbook this was found in, which is what `sheets.first` reaches for. Writing worksheet XML over
+that part would put a blank grid where a chart was, so it throws.
+
+**A shared formula's master and an array formula's anchor cannot be edited.** Their text and
+`ref` are what every follower or member depends on, and replacing one would break cells the
+caller never touched. Expanding the group first would lift this; refusing is what it does now.
+
+**Nothing understands what it preserves.** Conditional formatting, page setup, pivot caches,
+`dxfs`, theme colours and the rest come through byte for byte and cannot be *edited* through
+this library — it will not help you change a chart's source range or a pivot's field list.
+
+**A chart's source range does not follow an insert.** Writing past the end of a sheet widens
+`<dimension>`; it does not update a chart, a pivot cache or a defined name that referred to the
+old extent.
 
 Steps 1–4 are done, 2a is withdrawn, and step 5 is two-thirds done. What is left is the one
 thing §18.4 amended rather than inherited: `fullCalcOnLoad` is honest and wrong for a workbook

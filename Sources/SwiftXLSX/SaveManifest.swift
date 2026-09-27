@@ -158,6 +158,18 @@ extension Workbook {
         return false
     }
 
+    /// Whether any pending edit puts a style on a cell the file does not already have.
+    var appendsAStyle: Bool {
+        for sheet in sheets where sheet.hasUnsavedChanges {
+            for reference in sheet.changedCells {
+                guard let entry = sheet.entry(at: reference.reference), entry.1 != .general,
+                      sheet.wasReadFromFile(reference.reference) == false else { continue }
+                return true
+            }
+        }
+        return false
+    }
+
     /// ``SaveStrategy/surgical`` if this workbook was read from an archive,
     /// ``SaveStrategy/generated`` if it was composed in code.
     public var defaultSaveStrategy: SaveStrategy {
@@ -223,6 +235,12 @@ extension Workbook {
         // and never claiming it would understate the one edit where it matters.
         if appendsASharedString {
             rewritten.append("xl/sharedStrings.xml")
+        }
+        // A style index is positional, so a new cell's style is appended to the file's own
+        // table. Only a *new* cell can need one: an edited cell keeps the `s` it had, because
+        // changing what a cell says is not changing how it looks.
+        if appendsAStyle {
+            rewritten.append("xl/styles.xml")
         }
         // Marking the file for recalculation edits `<calcPr>`, so the workbook part changes
         // too — and a caller being shown this before agreeing to it should see that.

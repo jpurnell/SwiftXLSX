@@ -125,7 +125,11 @@ extension Workbook {
                                   origin: [ZIPEntry]) throws -> [String: Data] {
         var replacements: [String: Data] = [:]
         var appendedSharedString = false
-        var registeredStyle = false
+        // Carried from one sheet's splice to the next: two sheets each adding a styled cell
+        // must append to the same table, not each to the original.
+        var styles = origin.first { $0.path == "xl/styles.xml" }
+            .map { String(decoding: $0.data, as: UTF8.self) }
+        var appendedStyles = false
 
         for sheet in edited {
             guard let part = sheet.originPart else {
@@ -152,10 +156,13 @@ extension Workbook {
                                            original: String(decoding: entry.data, as: UTF8.self))
             let result = try splicer.spliced(edits(of: sheet),
                                              sharedStrings: sharedStrings,
-                                             styleSheet: styleSheet)
+                                             styles: styles)
             replacements[part] = Data(result.xml.utf8)
             appendedSharedString = appendedSharedString || result.appendedSharedString
-            registeredStyle = registeredStyle || result.registeredStyle
+            if let appended = result.styles {
+                styles = appended
+                appendedStyles = true
+            }
         }
 
         // Both tables are append-only on this path: the reader loaded them from the file, so
@@ -163,8 +170,11 @@ extension Workbook {
         if appendedSharedString {
             replacements["xl/sharedStrings.xml"] = Data(sharedStrings.toXML().utf8)
         }
-        if registeredStyle {
-            replacements["xl/styles.xml"] = Data(styleSheet.toXML().utf8)
+        // The file's own part with one `<xf>` on the end, never this library's regeneration of
+        // it: `StyleSheet.toXML()` models a fraction of what a real styles part holds, so
+        // rewriting it would keep every index and flatten what they point at.
+        if appendedStyles, let styles {
+            replacements["xl/styles.xml"] = Data(styles.utf8)
         }
         return replacements
     }

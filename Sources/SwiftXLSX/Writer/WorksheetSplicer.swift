@@ -38,8 +38,8 @@ struct WorksheetSplicer {
         let xml: String
         /// True if a string was appended to the shared table.
         let appendedSharedString: Bool
-        /// True if a style was registered that the file did not already have.
-        let registeredStyle: Bool
+        /// The styles part, rewritten, if a new cell's style had to be appended to it.
+        let styles: String?
     }
 
     let part: String
@@ -50,17 +50,17 @@ struct WorksheetSplicer {
     /// - Parameters:
     ///   - edits: The cells to write.
     ///   - sharedStrings: The workbook's string table, appended to for a text value.
-    ///   - styleSheet: The workbook's style table, appended to for a new cell's style.
+    ///   - styles: The file's own `xl/styles.xml`, appended to for a new cell's style.
     /// - Returns: The new XML and what it needed from those tables.
     /// - Throws: ``SaveError/spliceFailed(part:reason:)`` if the sheet has no `<sheetData>`, or
     ///   if an edit would break a cell the caller did not touch.
     func spliced(_ edits: [Edit], sharedStrings: SharedStrings,
-                 styleSheet: StyleSheet) throws -> Result {
+                 styles: String?) throws -> Result {
         guard let sheetData = Self.element(named: "sheetData", in: original,
                                            from: original.startIndex) else {
             throw SaveError.spliceFailed(part: part, reason: "the sheet has no <sheetData>")
         }
-        var state = State(sharedStrings: sharedStrings, styleSheet: styleSheet)
+        var state = State(sharedStrings: sharedStrings, styles: styles)
         let body = sheetData.inner.map { String(original[$0]) } ?? ""
         let rewritten = try rewrite(body: body, edits: edits, state: &state)
 
@@ -74,7 +74,7 @@ struct WorksheetSplicer {
         }
         xml = Self.widenedDimension(in: xml, toCover: edits.map(\.reference))
         return Result(xml: xml, appendedSharedString: state.appendedSharedString,
-                      registeredStyle: state.registeredStyle)
+                      styles: state.appendedStyles ? state.styles : nil)
     }
 
     // MARK: - Rows
@@ -188,21 +188,21 @@ struct WorksheetSplicer {
             attributes = Self.removingAttribute("t", from: String(originalAttributes))
         } else {
             attributes = "r=\"\(edit.reference.reference)\""
-            // **A style index is positional too, and this table is not the file's.** The reader
-            // parses `xl/styles.xml` into its own type and never fills the workbook's
-            // ``StyleSheet``, so `register` would allocate index 0 for the first style asked
-            // for — and index 0 in the file is whatever that file's first format happens to be.
-            // Every cell already carrying `s="0"` would be claimed to share a format it does
-            // not have. Refusing is the honest answer until the reader loads the table.
-            //
-            // A new cell written with no style is fine: it gets no `s` attribute, which means
-            // the default format, exactly as an unformatted cell in any file does.
-            guard edit.style == .general else {
-                throw SaveError.spliceFailed(
-                    part: part,
-                    reason: "\(edit.reference.reference) is a new cell with a style, and this "
-                        + "workbook's style table was not read from the file, so a new style "
-                        + "index cannot be allocated without colliding with the file's")
+            // A new cell with no style gets no `s` attribute, which means the default format —
+            // exactly as an unformatted cell in any file does. One *with* a style needs an
+            // index, and a style index is positional, so it has to be appended to the file's
+            // own table rather than allocated out of this library's. See ``StylesAppender``.
+            if edit.style != .general {
+                guard let original = state.styles else {
+                    throw SaveError.spliceFailed(
+                        part: part,
+                        reason: "\(edit.reference.reference) is a new cell with a style, and "
+                            + "this workbook has no xl/styles.xml to append one to")
+                }
+                let appended = try StylesAppender(original: original).appending(edit.style)
+                state.styles = appended.xml
+                state.appendedStyles = true
+                attributes += " s=\"\(appended.index)\""
             }
         }
 
@@ -377,8 +377,10 @@ struct WorksheetSplicer {
     /// What the splice asked of the workbook's tables.
     private struct State {
         let sharedStrings: SharedStrings
-        let styleSheet: StyleSheet
+        /// The styles part as it stands, carried through so several new styled cells append to
+        /// one another rather than each to the original.
+        var styles: String?
         var appendedSharedString = false
-        var registeredStyle = false
+        var appendedStyles = false
     }
 }

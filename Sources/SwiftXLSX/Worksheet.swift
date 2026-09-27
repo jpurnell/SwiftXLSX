@@ -86,6 +86,20 @@ public final class Worksheet: @unchecked Sendable {
         changedReferences.append(ref)
     }
 
+    /// Whether a cell was in the file when this worksheet was read.
+    ///
+    /// A *new* cell's style has to be appended to the file's style table; an edited one keeps
+    /// the `s` attribute it already had, because changing what a cell says is not changing how
+    /// it looks. Recorded at the end of the read rather than inferred from the cell map, which
+    /// by then holds the caller's writes too.
+    ///
+    /// - Parameter ref: The cell reference, in A1 notation.
+    /// - Returns: `true` if the file had that cell.
+    func wasReadFromFile(_ ref: String) -> Bool { cellsAsRead.contains(ref) }
+
+    /// The references the file held, frozen when recording begins.
+    private var cellsAsRead: Set<String> = []
+
     /// The value and style stored at one cell, for a writer that needs both.
     ///
     /// - Parameter ref: The cell reference, in A1 notation.
@@ -112,6 +126,7 @@ public final class Worksheet: @unchecked Sendable {
     /// Called by ``Workbook/init(xlsxData:)`` once the read has finished.
     func beginRecordingChanges() {
         isRecordingChanges = true
+        cellsAsRead = Set(cells.keys)
     }
 
     /// The archive part this worksheet was read from, or `nil` if it was composed in code.

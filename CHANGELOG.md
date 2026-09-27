@@ -9,6 +9,30 @@
 
 ### Added
 
+- **A new cell can be given a style, in a workbook this library did not write.** It used to be
+  refused, because a style index is positional — `s="7"` means "the eighth `<xf>` of this file's
+  `<cellXfs>`" — and neither way of getting one was safe. Registering into this library's own
+  `StyleSheet` handed out index `0`, the file's *first* format, which every cell already
+  carrying `s="0"` would then be claimed to share. Adopting the parsed table and regenerating
+  would have been worse: `StyleSheet.toXML()` writes a styles part out of `CellStyle`, which
+  models a fraction of what a real one holds, so the indices would survive and the formatting
+  they point at would not.
+
+  `StylesAppender` edits the file's own `xl/styles.xml` instead. The new `<xf>` goes on the end
+  of `<cellXfs>`, its font, fill and border on the end of theirs, each `count` bumped, and every
+  index the file already used still means exactly what it meant. A collection the file lacks is
+  created in its place in the schema order — `<numFmts>` before `<fonts>`, because Excel repairs
+  a styleSheet whose children are out of order by deleting what it could not place.
+
+  `<numFmts>` is keyed rather than positional, so a custom format takes the first id **free in
+  that file**: on a real workbook already using 164–205, the appended format became 206.
+
+  Measured on a 105 KB styles part with 584 `<xf>` entries: all 584 unchanged and in order, one
+  appended, the part grew 353 bytes, and the cell was written `<c r="ZZ900" s="584">`.
+
+  An *edited* cell is unaffected and still keeps the `s` it had — changing what a cell says is
+  not changing how it looks.
+
 - **`StaleValuePolicy`, and an edit now tells Excel to recalculate.** Every formula cell carries
   the value Excel last computed for it; change a precedent and its dependents' caches are lies,
   and a surgical save deliberately leaves those cells alone — so until now nothing in the file
