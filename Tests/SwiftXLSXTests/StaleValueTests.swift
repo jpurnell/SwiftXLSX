@@ -125,6 +125,39 @@ struct StaleValueTests {
         #expect(!after.contains("fullCalcOnLoad=\"0\""), "\(after)")
     }
 
+    /// **A `<calcPr>` written as a pair, not self-closed.** Both spellings are valid and Excel
+    /// writes both; one corpus workbook writes `<calcPr calcId="125725"></calcPr>`.
+    ///
+    /// The first version of this matched only the opening tag and replaced it with a
+    /// self-closing one, which left `</calcPr>` behind with nothing to close:
+    ///
+    /// ```
+    /// <calcPr calcId="125725" fullCalcOnLoad="1"/></calcPr></workbook>
+    /// ```
+    ///
+    /// Malformed, and the whole workbook part stopped parsing. Every test here used the
+    /// self-closing spelling, so nothing caught it until a full-corpus run over 2,242
+    /// workbooks found the two that did not.
+    @Test("a calcPr written as a pair is replaced whole, not left with an orphan close tag")
+    func handlesAPairedCalcPr() throws {
+        let after = try workbookPart("<calcPr calcId=\"125725\"></calcPr>")
+        #expect(after.contains("fullCalcOnLoad=\"1\""), "\(after)")
+        #expect(after.contains("calcId=\"125725\""), "\(after)")
+        #expect(!after.contains("</calcPr>"), "an orphaned close tag was left: \(after)")
+        #expect(after.components(separatedBy: "<calcPr").count - 1 == 1,
+                "one calcPr, not two: \(after)")
+    }
+
+    /// And the part still parses afterwards, which is the thing that actually broke.
+    @Test("the workbook still reads after a paired calcPr is rewritten")
+    func aPairedCalcPrStillParses() throws {
+        let workbook = try Workbook(xlsxData: try package("<calcPr calcId=\"125725\"></calcPr>"))
+        try #require(workbook.sheets.first).write(99.0, to: "A1")
+        let reopened = try Workbook(xlsxData: try workbook.save())
+        #expect(reopened.sheets.count == 1)
+        #expect(try #require(reopened.sheets.first).cell(at: "A1") == .number(99))
+    }
+
     // MARK: - Leaving alone
 
     /// **Nothing changed, so nothing is stale.** An unedited save must still be byte-identical,

@@ -7,6 +7,25 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `<calcPr>` written as a pair no longer corrupts the workbook part.** Marking a file for
+  recalculation matched only the opening tag and replaced it with a self-closing one, which
+  left `</calcPr>` behind with nothing to close:
+
+  ```xml
+  <calcPr calcId="125725" fullCalcOnLoad="1"/></calcPr></workbook>
+  ```
+
+  `xl/workbook.xml` then stopped parsing, so an edited workbook could not be read back — by
+  this library or, presumably, by Excel. Both spellings are valid and Excel writes both; the
+  whole element is now replaced however it is spelled.
+
+  Introduced in 0.37.0 and found by the first **full-corpus** run: 2,242 workbooks, of which
+  exactly **two** write `<calcPr>` as a pair. Every test for the feature used the self-closing
+  spelling, which is why nothing caught it — and why the sample of fifty that every other figure
+  came from did not either.
+
 ## [0.37.0] - 2026-09-26
 
 **Opening somebody's workbook and saving it no longer destroys it.** Measured over a

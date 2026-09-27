@@ -190,9 +190,14 @@ extension Workbook {
 
     /// The workbook part, with `<calcPr>` told to recalculate everything on open.
     ///
-    /// Three shapes to handle, and the third is why this is not a string replacement:
+    /// Four shapes to handle:
     ///
     /// - `<calcPr calcId="191029"/>` — add the attribute, keep the others.
+    /// - `<calcPr calcId="125725"></calcPr>` — **the same thing written as a pair.** Both
+    ///   spellings are valid and Excel writes both. Replacing only the opening tag leaves
+    ///   `</calcPr>` behind with nothing to close, which stops the whole part parsing; two
+    ///   corpus workbooks out of 2,242 are written this way, and every test here used the
+    ///   self-closing spelling until one of them found it.
     /// - `<calcPr … fullCalcOnLoad="0"/>` — an explicit instruction *not* to recalculate,
     ///   which an edit has just made wrong.
     /// - no `<calcPr>` at all — add one, **before `<extLst>`**. The schema fixes the order of
@@ -203,8 +208,12 @@ extension Workbook {
     /// - Returns: The same XML, recalculating on load.
     private static func recalculatingOnLoad(_ data: Data) -> Data {
         var text = String(decoding: data, as: UTF8.self)
-        if let element = text.range(of: "<calcPr[^>]*>", options: .regularExpression) {
+        // The whole element, however it is spelled: `<calcPr …/>` or `<calcPr …></calcPr>`.
+        // Matching the opening tag alone orphans the closing one.
+        if let element = text.range(of: "<calcPr[^>]*></calcPr>|<calcPr[^>]*/>|<calcPr[^>]*>",
+                                    options: .regularExpression) {
             var attributes = String(text[element])
+                .replacingOccurrences(of: "</calcPr>", with: "")
                 .replacingOccurrences(of: "<calcPr", with: "")
                 .replacingOccurrences(of: "/>", with: "")
                 .replacingOccurrences(of: ">", with: "")
