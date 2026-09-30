@@ -311,6 +311,25 @@ private struct TokenParser {
             return .error(value)
 
         case .cellRef(let ref):
+            // **`LOG10(x)` is a function, not a call on column LOG row 10.**
+            //
+            // The lexer reads left to right with no list of function names, so letters then
+            // digits is a cell — and `LOG10` is a syntactically perfect one. The parser then
+            // did something reasonable with a cell followed by `(`: it built the
+            // immediately-invoked form that `LAMBDA(x,x+1)(5)` needs. The formula parsed,
+            // serialized back out unchanged, and evaluated to `#VALUE!`.
+            //
+            // Nothing is traded away by preferring the function. Excel has no syntax for
+            // calling a cell's contents: a stored `LAMBDA` is reached through a defined name,
+            // and the immediately-invoked form applies to a *call's result*, which arrives
+            // here as `.function` rather than as a bare reference. Found on a workbook with
+            // 300 cells of `LOG10(Data!B5)`, every one reading zero.
+            //
+            // A **pinned** reference stays a cell: a function name cannot carry `$`.
+            if peek == .leftParen, !ref.absoluteColumn, !ref.absoluteRow {
+                advance()
+                return try parseFunctionCall(ref.reference)
+            }
             advance()
             return try parseCellRefOrRange(ref)
 

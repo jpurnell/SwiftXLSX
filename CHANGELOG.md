@@ -7,6 +7,29 @@
 
 ## [Unreleased]
 
+## [0.37.2] - 2026-09-29
+
+### Fixed
+
+- **`LOG10(x)` is a function, not a call on column `LOG` row 10.**
+
+  The lexer reads left to right with no list of function names, so letters followed by
+  digits is a cell reference — and `LOG10` is a syntactically perfect one. The parser then
+  did something reasonable with a cell followed by `(`: it built the immediately-invoked
+  form that `LAMBDA(x,x+1)(5)` needs. The result parsed without complaint, serialized back
+  out unchanged, round-tripped through a file, and evaluated to `#VALUE!`.
+
+  A cell reference immediately followed by `(` is now read as a function name. Nothing is
+  traded away by preferring the function: Excel has no syntax for calling a cell's
+  contents — a stored `LAMBDA` is reached through a defined name, and the
+  immediately-invoked form applies to a *call's result*, which arrives at that point as a
+  `.function` rather than as a bare reference. A **pinned** reference stays a cell, because
+  a function name cannot carry `$`.
+
+  Found on a real workbook: 300 cells of `LOG10(Data!B5)` transforming a data table for a
+  regression, every one computing zero against the value Excel had written beside it. The
+  cached values were right, so nothing was visibly wrong until something recalculated them.
+
 ## [0.37.1] - 2026-09-27
 
 **Upgrade from 0.37.0.** That release could corrupt `xl/workbook.xml` when saving an edited
