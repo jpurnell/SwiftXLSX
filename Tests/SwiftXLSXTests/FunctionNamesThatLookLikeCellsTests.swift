@@ -1,4 +1,4 @@
-import XCTest
+import Testing
 @testable import SwiftXLSX
 import SwiftExcelCore
 
@@ -27,89 +27,103 @@ import SwiftExcelCore
 ///
 /// **`$LOG$10(` stays a cell**, because a function name cannot carry `$` and a pinned
 /// reference is unambiguous about being one.
-final class FunctionNamesThatLookLikeCellsTests: XCTestCase {
+@Suite
+struct FunctionNamesThatLookLikeCellsTests {
 
     /// **The one that was found in the wild.**
-    func testLog10IsAFunctionAndNotColumnLOGRow10() throws {
+    @Test func log10IsAFunctionAndNotColumnLOGRow10() throws {
         let ast = try FormulaParser.parse("LOG10(A1)")
         guard case .function(let name, let arguments) = ast else {
-            return XCTFail("parsed as \(ast) — a call on a cell, which Excel has no syntax for")
+            Issue.record("parsed as \(ast) — a call on a cell, which Excel has no syntax for")
+            return
         }
-        XCTAssertEqual(name, "LOG10")
-        XCTAssertEqual(arguments.count, 1)
+        #expect(name == "LOG10")
+        #expect(arguments.count == 1)
     }
 
     /// The cross-sheet form, which is how the corpus writes it.
-    func testLog10AcrossASheet() throws {
+    @Test func log10AcrossASheet() throws {
         let ast = try FormulaParser.parse("LOG10(Data!B5)")
         guard case .function(let name, let arguments) = ast,
               case .sheetRef(let reference) = arguments.first else {
-            return XCTFail("parsed as \(ast)")
+            Issue.record("parsed as \(ast)")
+            return
         }
-        XCTAssertEqual(name, "LOG10")
-        XCTAssertEqual(reference.sheetName, "Data")
+        #expect(name == "LOG10")
+        #expect(reference.sheetName == "Data")
     }
 
     /// `ATAN2` collides the same way: column `ATAN`, row 2.
-    func testAtan2IsAFunction() throws {
+    @Test func atan2IsAFunction() throws {
         let ast = try FormulaParser.parse("ATAN2(1,1)")
         guard case .function(let name, let arguments) = ast else {
-            return XCTFail("parsed as \(ast)")
+            Issue.record("parsed as \(ast)")
+            return
         }
-        XCTAssertEqual(name, "ATAN2")
-        XCTAssertEqual(arguments.count, 2)
+        #expect(name == "ATAN2")
+        #expect(arguments.count == 2)
     }
 
     /// It survives a round trip, which is what the app needs: a collected cell is serialized,
     /// `+PsiOutput()` appended, and the result parsed again.
-    func testItSurvivesSerializingAndReparsing() throws {
+    @Test func itSurvivesSerializingAndReparsing() throws {
         let first = try FormulaParser.parse("LOG10(Data!B5)")
         let text = FormulaSerializer.serialize(first)
         let again = try FormulaParser.parse(text + "+1")
 
         guard case .add(let left, _) = again, case .function(let name, _) = left else {
-            return XCTFail("round trip produced \(again)")
+            Issue.record("round trip produced \(again)")
+            return
         }
-        XCTAssertEqual(name, "LOG10")
+        #expect(name == "LOG10")
     }
 
     // MARK: - What must not change
 
     /// A pinned reference is a cell, whatever follows it. A function name cannot carry `$`.
-    func testAPinnedReferenceIsStillACell() throws {
+    @Test func aPinnedReferenceIsStillACell() throws {
         let ast = try FormulaParser.parse("$LOG$10")
-        guard case .cellRef(let ref) = ast else { return XCTFail("parsed as \(ast)") }
-        XCTAssertTrue(ref.absoluteColumn)
-        XCTAssertTrue(ref.absoluteRow)
+        guard case .cellRef(let ref) = ast else {
+            Issue.record("parsed as \(ast)")
+            return
+        }
+        #expect(ref.absoluteColumn)
+        #expect(ref.absoluteRow)
     }
 
     /// A reference with nothing after it is a reference.
-    func testABareReferenceIsStillACell() throws {
-        guard case .cellRef = try FormulaParser.parse("LOG10") else {
-            return XCTFail("a bare LOG10 is a cell — there is no call to make it a function")
-        }
-        guard case .multiply(.cellRef, .number(2)) = try FormulaParser.parse("LOG10*2") else {
-            return XCTFail("and arithmetic on it reads it as a cell")
-        }
+    @Test func aBareReferenceIsStillACell() throws {
+        let bare = try FormulaParser.parse("LOG10")
+        var bareIsACell = false
+        if case .cellRef = bare { bareIsACell = true }
+        #expect(bareIsACell, "a bare LOG10 is a cell — there is no call to make it a function; parsed as \(bare)")
+
+        let arithmetic = try FormulaParser.parse("LOG10*2")
+        var arithmeticReadsACell = false
+        if case .multiply(.cellRef, .number(2)) = arithmetic { arithmeticReadsACell = true }
+        #expect(arithmeticReadsACell, "and arithmetic on it reads it as a cell; parsed as \(arithmetic)")
     }
 
     /// The immediately-invoked lambda still works: it applies to a **call's result**, which is
     /// a different shape from a bare reference and is left alone.
-    func testAnImmediatelyInvokedLambdaStillParses() throws {
+    @Test func anImmediatelyInvokedLambdaStillParses() throws {
         let ast = try FormulaParser.parse("LAMBDA(x,x+1)(5)")
         guard case .call(let callee, let arguments) = ast else {
-            return XCTFail("parsed as \(ast)")
+            Issue.record("parsed as \(ast)")
+            return
         }
         guard case .function("LAMBDA", _) = callee else {
-            return XCTFail("callee is \(callee)")
+            Issue.record("callee is \(callee)")
+            return
         }
-        XCTAssertEqual(arguments.count, 1)
+        #expect(arguments.count == 1)
     }
 
     /// An ordinary range is untouched.
-    func testARangeIsUnaffected() throws {
-        guard case .cellRange = try FormulaParser.parse("A1:B9") else {
-            return XCTFail("a range is a range")
-        }
+    @Test func aRangeIsUnaffected() throws {
+        let ast = try FormulaParser.parse("A1:B9")
+        var isARange = false
+        if case .cellRange = ast { isARange = true }
+        #expect(isARange, "a range is a range; parsed as \(ast)")
     }
 }
