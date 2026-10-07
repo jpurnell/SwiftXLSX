@@ -7,6 +7,30 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Gate telemetry reaches the corpus again, and `consistency` runs instead of skipping.**
+  `.quality-gate.yml` carried `corpusPath: ${ORG_JUDGEMENT_CORPUS:-}` from the 2026-09-12 history
+  remediation, which replaced an absolute path so that none would be published here. The gate
+  does not expand shell syntax in its config. It used the string as a relative path, so every run
+  since created and wrote into a directory literally named `${ORG_JUDGEMENT_CORPUS:-}` in this
+  checkout — 485 telemetry files, 2026-09-13 to 2026-10-06 — and none of it reached the corpus.
+  `consistency` was pointed at that directory, found no pulse in it, and printed `PASSED` over a
+  note saying it had skipped. Exporting the variable changed nothing; it was never read.
+
+  `corpusPath` is now `../Tools/org-judgement-corpus`, a literal relative path: the form the gated
+  repositories that sit beside the corpus already use, and one that still publishes no absolute
+  path. With it, `--check all` is 46 of 46, 0 errors, 0 warnings, and `consistency` audited the
+  run for the first time since the remediation: score 1.00 against a 0.70 threshold, no findings.
+  
+  `.gitignore` had been taught to ignore that directory, which is what kept it out of sight here
+  for three weeks. The entry is removed: if the directory ever comes back it should show up.
+
+  The stranded telemetry was moved, not deleted — out of this repository and into a holding
+  directory in the corpus, beside `telemetry/` and unread by anything, with a note on what a
+  merge would involve. No source changed. The gate itself is being fixed separately to refuse a
+  path it cannot use as written rather than act on it.
+
 ## [0.37.2] - 2026-09-29
 
 ### Fixed

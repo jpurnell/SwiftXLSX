@@ -250,6 +250,11 @@ works, so round-trip tests are structurally unable to find these:
 - Quality gate green at 45/45 checkers, 0 errors / 0 warnings, with no overrides,
   suppressions, or checker exclusions. The gate config previously used two
   unrecognised keys, so five checkers silently never ran; corrected 2026-08-25.
+- Gate telemetry did not reach the corpus from 2026-09-13 to 2026-10-06, and `consistency`
+  passed by skipping throughout: `corpusPath` was `${ORG_JUDGEMENT_CORPUS:-}`, which the gate
+  used as a literal directory name. Now a literal relative path; `consistency` runs (1.00
+  against 0.70, no findings) and the gate is 46/46, 0/0. Corrected 2026-10-06. The "45/45"
+  above is the count as of 2026-08-25 and was not otherwise re-verified here.
 - Test counts fell from ~1414 to 847 across 0.12.0–0.13.0 because 170 tests went to
   SwiftExcelCore and 546 to SwiftExcelFunctions with the code they cover. None were
   lost, and each split was verified by counting both sides.
@@ -315,7 +320,8 @@ of Phase H, and the list below meant both before it.
 
 ---
 
-*Last updated: 2026-09-26 -- added Phase H (surgical save, 0.37.0) and reconciled Non-Goals
+*Last updated: 2026-10-06 -- Quality: recorded the `corpusPath` repair and the three weeks of
+telemetry that missed the corpus. Before that, 2026-09-26 -- added Phase H (surgical save, 0.37.0) and reconciled Non-Goals
 against it: charts, macros and pivots are still not *authored* here, and are now *preserved*,
 which the old list did not distinguish and which is the whole point of the phase.
 
